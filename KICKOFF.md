@@ -1,6 +1,6 @@
-# FANTASY CRICKET — KICKOFF v1.1, 08/07/2026 (supersedes v1.0 same day)
-### v1.1 amendment A1 (operator-directed): starting-price rule replaced — floor-to-
-### performance interpolation over games 1–4, replacing phantom-game shrinkage.
+# FANTASY CRICKET — KICKOFF v1.2, 09/07/2026 (supersedes v1.1)
+### v1.2: standing rules 7 (plan approval ends the turn) and 8 (designated-branch
+### + operator PR-merge workflow). v1.1 was amendment A1 (starting-price rule).
 ### Club fantasy cricket platform. Tier Lite (SHAPE 22, error-costly sub-gate unmet).
 ### Seats: Luke = OPERATOR / league manager. Fable chat = spec/reviewer. Claude Code
 ### (Opus) = builder. No standing auditor; one cold acceptance run before ship.
@@ -95,12 +95,17 @@ from the settings page; post-lock immutable via UI and API (Gate G10).
 5. Smallest real task end-to-end first: one grade, one reference scorecard, one
    round, before scaling anything (checklist §7 of the playbook).
 6. State-stamp every handoff (as-of date + commit hash + supersedes).
+7. PLAN APPROVAL (added v1.2): when a kickoff says plan mode / plan first,
+   presenting the plan ENDS the turn — stop and wait for the operator's
+   explicit approval before writing anything, whether or not the harness
+   enforces a plan mode. Presenting and proceeding in one breath skips the
+   checkpoint.
+8. BRANCH WORKFLOW (added v1.2): push to the harness-designated branch; the
+   operator merges to main via PR (rebase-and-merge; hashes are rewritten, so
+   each kickoff quotes main's actual HEAD from GitHub, never the prior
+   session's claim). Fast-forwarding a local main does not update origin.
 
 ## DEFINITION OF HEALTHY (season operations, checked weekly)
 Ladder, scores, and prices correct within 24h of the round's final day; zero manual
 edits to derived state all season; weekly admin ≤ 30 min total (baseline gate B1);
 every anomaly resolved by scorecard correction + recompute, never by patching output.
-- OPERATIONAL REQUIREMENT (locks slice): the mid-match trade lock (G6/D7) bites only
-  once a lineup exists for the in_progress match. Lineups MUST be entered when a match
-  goes in_progress — i.e. day-one entry for two-day matches — or day-1 information can
-  be traded on before the lock engages.

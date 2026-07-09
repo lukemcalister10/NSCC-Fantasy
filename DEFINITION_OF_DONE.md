@@ -1,6 +1,7 @@
-# DEFINITION OF DONE v1.1, 08/07/2026 — FROZEN AT KICKOFF (Law 3)
-### (supersedes v1.0 same day; delta = G14 added under operator amendment A1,
-### pre-build — no code exists yet, so the freeze is amended, not violated)
+# DEFINITION OF DONE v1.2, 09/07/2026 — FROZEN AT KICKOFF (Law 3)
+### (supersedes v1.1; delta = G15 added under operator amendment A8, pre-build
+### of the validation slice — the freeze is amended before code exists, not
+### violated. v1.1 delta was G14 under amendment A1.)
 ### All gates run against the FIXTURE CONFIG (test values below), so they are frozen
 ### now even though the real season economy (O1–O5) is decided at season lock.
 ### Ship = every gate green in a COLD acceptance run (fresh session, repo + this file
@@ -54,6 +55,18 @@ SR ≥ 150 over ≥ 10 balls, economy bonus +10 if econ ≤ 3.0 over ≥ 3 overs
   $48,000 / $61,000 exactly. 6-game player averaging 61 → $61,000 (g caps at 4).
   Zero-history player → $9,000. Player averaging 5 over 4 games → clamps at
   $9,000. A raw result ending in $x50 rounds UP to the next $100.
+- G15 SELECTION_VALIDATION (added by amendment A8, 09/07/2026, pre-build of the
+  validation slice). At commit time, a team's round selection set must satisfy:
+  count = teamSize; per-role counts ≥ roleMinimums under STRICT counting (a
+  player fills only their own role's minimum; the flex remainder is the only
+  wildcard); the WK minimum satisfiable by WK-role OR wk_eligible players (D9).
+  Violations rejected server-side (direct write, not UI). Trades: one trade =
+  one sell + one buy pair; pairs per (team, round) ≤ tradesPerRound from config;
+  initial squad construction (no prior holdings) is exempt from the trade count
+  but not from composition/size/cap. Hand-worked cases: a valid squad passes;
+  size-1 short rejected; minimums-short rejected; WK minimum satisfied via a
+  wk_eligible non-WK passes; trades at the limit pass, limit+1 rejected;
+  initial build of a full squad consumes zero trades.
 - B1 BASELINE (pre-registered, Law 3). Full round processed end-to-end — scorecards
   in (manual or screenshot), scores, prices, ladder out — in ≤ 30 minutes of
   operator time, measured on a real 3-grade round. The naive alternative is the
