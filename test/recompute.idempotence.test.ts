@@ -38,6 +38,23 @@ const SEL2 = "00000000-0000-0000-0000-000000000102";
 const SEL3 = "00000000-0000-0000-0000-000000000103";
 const SEL4 = "00000000-0000-0000-0000-000000000104";
 const SEL5 = "00000000-0000-0000-0000-000000000105";
+// G15 (v1.2): both teams' selection sets must now be legal fixture squads
+// (size 6 = 2 BAT/1 WK/2 BWL/1 AR). Each team is padded up to 6 with players who
+// are NEVER in M1's lineup — they are DNP (no player_match_score row → contribute
+// 0), so every hand-worked total below is UNCHANGED (inputs expanded, zero
+// expected-value change). The padding players are untraded, exactly as FT2's
+// existing A/B/X selections are (selection != ownership in this scaffold).
+const PAD_BAT = "00000000-0000-0000-0000-0000000000aa";
+const PAD_WK = "00000000-0000-0000-0000-0000000000ab";
+const PAD_BWL = "00000000-0000-0000-0000-0000000000ac";
+const PAD_AR = "00000000-0000-0000-0000-0000000000ad";
+const SEL6 = "00000000-0000-0000-0000-000000000106";
+const SEL7 = "00000000-0000-0000-0000-000000000107";
+const SEL8 = "00000000-0000-0000-0000-000000000108";
+const SEL9 = "00000000-0000-0000-0000-000000000109";
+const SEL10 = "00000000-0000-0000-0000-00000000010a";
+const SEL11 = "00000000-0000-0000-0000-00000000010b";
+const SEL12 = "00000000-0000-0000-0000-00000000010c";
 
 /**
  * @param withExtra when true, player X is (wrongly) added to the lineup + batting
@@ -65,6 +82,11 @@ function buildRaw(withExtra: boolean): RawSeason {
       { id: A, registryKey: A, displayName: "A", role: "BAT", wkEligible: false, startingPrice: 60_000, active: true },
       { id: B, registryKey: B, displayName: "B", role: "BWL", wkEligible: false, startingPrice: 50_000, active: true },
       { id: X, registryKey: X, displayName: "X", role: "BAT", wkEligible: false, startingPrice: 30_000, active: true },
+      // DNP padding so each fantasy team is a legal G15 squad; never in M1's lineup.
+      { id: PAD_BAT, registryKey: PAD_BAT, displayName: "PadBat", role: "BAT", wkEligible: false, startingPrice: 9_000, active: true },
+      { id: PAD_WK, registryKey: PAD_WK, displayName: "PadWk", role: "WK", wkEligible: false, startingPrice: 9_000, active: true },
+      { id: PAD_BWL, registryKey: PAD_BWL, displayName: "PadBwl", role: "BWL", wkEligible: false, startingPrice: 9_000, active: true },
+      { id: PAD_AR, registryKey: PAD_AR, displayName: "PadAr", role: "AR", wkEligible: false, startingPrice: 9_000, active: true },
     ],
     rounds: [{ id: R1, seq: 1, name: "R1", lockAt: "2026-10-01T00:30:00Z" }],
     matches: [
@@ -95,11 +117,20 @@ function buildRaw(withExtra: boolean): RawSeason {
       { id: FT2, ownerProfileId: OWNER2, name: "Team 2" },
     ],
     selections: [
+      // FT1 = A(C) + B(VC) + DNP padding → 2 BAT / 1 WK / 2 BWL / 1 AR = legal squad.
       { id: SEL1, fantasyTeamId: FT1, roundId: R1, playerId: A, isCaptain: true, isViceCaptain: false },
       { id: SEL2, fantasyTeamId: FT1, roundId: R1, playerId: B, isCaptain: false, isViceCaptain: true },
+      { id: SEL6, fantasyTeamId: FT1, roundId: R1, playerId: PAD_BAT, isCaptain: false, isViceCaptain: false },
+      { id: SEL7, fantasyTeamId: FT1, roundId: R1, playerId: PAD_WK, isCaptain: false, isViceCaptain: false },
+      { id: SEL8, fantasyTeamId: FT1, roundId: R1, playerId: PAD_BWL, isCaptain: false, isViceCaptain: false },
+      { id: SEL9, fantasyTeamId: FT1, roundId: R1, playerId: PAD_AR, isCaptain: false, isViceCaptain: false },
+      // FT2 = B(C) + A(VC) + X + DNP padding → 2 BAT(A,X) / 1 WK / 2 BWL / 1 AR.
       { id: SEL3, fantasyTeamId: FT2, roundId: R1, playerId: B, isCaptain: true, isViceCaptain: false },
       { id: SEL4, fantasyTeamId: FT2, roundId: R1, playerId: A, isCaptain: false, isViceCaptain: true },
       { id: SEL5, fantasyTeamId: FT2, roundId: R1, playerId: X, isCaptain: false, isViceCaptain: false },
+      { id: SEL10, fantasyTeamId: FT2, roundId: R1, playerId: PAD_WK, isCaptain: false, isViceCaptain: false },
+      { id: SEL11, fantasyTeamId: FT2, roundId: R1, playerId: PAD_BWL, isCaptain: false, isViceCaptain: false },
+      { id: SEL12, fantasyTeamId: FT2, roundId: R1, playerId: PAD_AR, isCaptain: false, isViceCaptain: false },
     ],
     // Round-1 trades at price-entering-round-1 = starting price (Rider 2 holds).
     trades: [
