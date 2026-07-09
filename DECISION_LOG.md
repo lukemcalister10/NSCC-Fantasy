@@ -1,4 +1,4 @@
-# DECISION LOG v1.6, 09/07/2026 (supersedes v1.5; delta = A6: operator-chosen O4 scoring values, econ per-match floor rule, D1 $/pt restored to $1,000)
+# DECISION LOG v1.7, 09/07/2026 (supersedes v1.6; delta = A7: O1/O2/O3 resolved to club-team-count contingency tables; flex slot + minimums semantics; cap computed at lock)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -76,12 +76,30 @@
       come from circle orientation and never affect results.
 
 ## OPEN — DEFAULTS APPLY AT EXPIRY
-- O1 Trades per round + banking. DEFAULT: 2/round, non-banking. Depends on club
-    team count / pool size. EXPIRY: season lock.
-- O2 Team size & composition. DEFAULT: 11 = 4 BAT / 1 WK / 4 BWL / 2 AR.
-    EXPIRY: season lock.
-- O3 Salary cap. DEFAULT: 1.1 × (team size × club-average starting price),
-    computed at lock, rounded to nearest $10,000. EXPIRY: season lock.
+- O1 Trades per round (A7, 09/07/2026 — resolved to a contingency table, keyed
+    on club teams entered, decided when nominations close): 3 club teams →
+    2 trades/round; 4 or 5+ club teams → 3 trades/round. Non-banking (default
+    stands, flippable pre-lock). EXPIRY: season lock (pick the row).
+- O2 Team size & composition (A7 — contingency table; composition semantics
+    are now ROLE MINIMUMS + TOTAL SIZE, with FLEX = the unconstrained remainder):
+      3 club teams:  size 7  = BAT ≥3, BWL ≥2, AR ≥1, WK ≥1 (no flex)
+      4 club teams:  size 9  = BAT ≥3, BWL ≥3, AR ≥1, WK ≥1, 1 flex
+      5+ club teams: size 11 = BAT ≥4, BWL ≥4, AR ≥1, WK ≥1, 1 flex
+    Strict role counting: a player fills only their own role's minimum (AR is
+    never a BAT); flex is the only wildcard slot. WK minimum satisfiable by
+    WK-role or wk_eligible players (D9). BUILD NOTE: LeagueConfig.squad
+    composition type reshapes from exact counts to minimums+size BEFORE any
+    selection-validation layer is built (cheap now, a migration later);
+    composition enforcement currently has NO gate — named scope for the
+    app/validation slice. EXPIRY: season lock (pick the row).
+- O3 Salary cap (A7): cap = team_size × MEAN STARTING PRICE across ALL players
+    in the pool at season lock (i.e. 1.0×, no headroom — stars funded by
+    basement filler; gun-concentration accepted as a knowing choice), computed
+    BY the season-lock action itself (starting prices materialise at lock per
+    Rider 3, so the mean is well-defined at that moment), rounded to nearest
+    $100. Illustration on 25/26 data: mean $32,000 → 11-size cap ≈ $352k;
+    basement newcomers pull the mean (and cap) down by design.
+    EXPIRY: season lock (computed).
 - O4 Scoring values. OPERATOR-CHOSEN DRAFT (A6, 09/07/2026, supersedes the ×2
     scale): run 1, 50 bonus 10, 100 bonus 20, duck −5, not-out 5, four 1,
     six 3, wicket 19, maiden 1, 5WI 10, economy bonus = floor(max(0, 0.25 ×
