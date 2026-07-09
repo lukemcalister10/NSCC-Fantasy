@@ -10,3 +10,13 @@ export { repriceAfterMatch, repriceOverMatches } from "./engines/pricing.js";
 export { startingPrice } from "./engines/startingPrice.js";
 export { CapLedger } from "./engines/capLedger.js";
 export type { LedgerTxn, LedgerTxnKind, Holding } from "./engines/capLedger.js";
+
+// Recompute + persistence (partial G3: scores/prices/cap).
+export { recomputeSeason } from "./recompute/orchestrator.js";
+export * from "./recompute/types.js";
+export {
+  loadRawSeason,
+  writeDerived,
+  readDerived,
+} from "./db/repository.js";
+export type { DbClient } from "./db/repository.js";
