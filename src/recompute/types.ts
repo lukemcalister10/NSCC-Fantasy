@@ -8,7 +8,11 @@ import type { LedgerTxnKind } from "../engines/capLedger.js";
  * — the whole basis of G3 (byte-identical recompute).
  */
 
-export type MatchStatus = "scheduled" | "in_progress" | "finalised";
+export type MatchStatus =
+  | "scheduled"
+  | "in_progress"
+  | "finalised"
+  | "abandoned";
 export type ReviewState = "draft" | "committed";
 
 // ---- Raw truth --------------------------------------------------------------
@@ -141,18 +145,75 @@ export interface DerivedCapSnapshot {
   teamValue: number;
 }
 
+/** H2H outcome label. `bye` marks the fixture type; the bye team still earns a
+ *  W/L/T for the ladder by comparing its total to `byeMedian` (D11/D18). */
+export type H2hOutcome = "home" | "away" | "tie" | "bye";
+
 /**
- * Full derived chain. Core families are populated this slice; the rest are
- * present (empty) so the deferred engines (full-chain G3 + G9) slot in without
- * a shape change. Arrays are emitted in a deterministic order.
+ * Per-team round total (D10 captaincy applied HERE, not in scoreMatch): sum of
+ * the selected players' round-base (Σ pre-captaincy `base` over the round's
+ * matches), with the effective captain's round-base counted twice.
+ */
+export interface DerivedTeamRoundScore {
+  fantasyTeamId: string;
+  roundId: string;
+  /** Σ selected round-bases + effective-captain round-base (the ×2). */
+  total: number;
+  /** The player who actually received the ×2, or null if C and VC both DNP. */
+  captainPlayerId: string | null;
+}
+
+/**
+ * One derived H2H fixture result for a round. Fixtures are DERIVED (no fixtures
+ * table) via the deterministic round-robin. `awayTeamId === null` is a bye:
+ * the home (bye) team is scored against `byeMedian` (D11/D18).
+ *
+ * The physical `h2h_results.id` (a random-uuid surrogate) is deliberately NOT
+ * modelled here: it is never read back or compared, so recompute stays
+ * byte-identical. `(roundId, homeTeamId)` is the natural key.
+ */
+export interface DerivedH2hResult {
+  roundId: string;
+  homeTeamId: string;
+  awayTeamId: string | null;
+  homePoints: number;
+  awayPoints: number | null;
+  /** Set iff this is a bye (round median, incl. all teams, D11/D18). */
+  byeMedian: number | null;
+  outcome: H2hOutcome;
+}
+
+/** Ladder standings row (D11): wins primary, points-for tiebreak. */
+export interface DerivedLadderRow {
+  fantasyTeamId: string;
+  played: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  /** Σ the team's own round totals over active rounds. */
+  pointsFor: number;
+  /** 2·wins + 1·ties (structural convention, operator-confirmed; not economy config). */
+  ladderPoints: number;
+}
+
+/** Separate overall-points leaderboard (D11): Σ round totals over active rounds. */
+export interface DerivedOverallRow {
+  fantasyTeamId: string;
+  totalPoints: number;
+}
+
+/**
+ * Full derived chain. Every family is populated once the deferred engines land
+ * (this slice). Arrays are emitted in a deterministic order keyed on the exact
+ * string columns `readDerived` orders by, so the pglite round-trip is
+ * byte-identical (G3).
  */
 export interface DerivedState {
   playerMatchScores: DerivedPlayerMatchScore[];
   priceHistory: DerivedPricePoint[];
   teamCapSnapshots: DerivedCapSnapshot[];
-  // Deferred engines (full-chain G3 + G9):
-  teamRoundScores: never[];
-  h2hResults: never[];
-  ladder: never[];
-  overallLeaderboard: never[];
+  teamRoundScores: DerivedTeamRoundScore[];
+  h2hResults: DerivedH2hResult[];
+  ladder: DerivedLadderRow[];
+  overallLeaderboard: DerivedOverallRow[];
 }

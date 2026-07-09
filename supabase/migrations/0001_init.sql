@@ -20,7 +20,13 @@
 -- Enums
 -- ---------------------------------------------------------------------------
 CREATE TYPE player_role   AS ENUM ('BAT', 'WK', 'BWL', 'AR');
-CREATE TYPE match_status  AS ENUM ('scheduled', 'in_progress', 'finalised');
+-- 'abandoned' = washout (operator convention, this slice): the match happened on
+-- the fixture but produced no result. It yields NO score rows and NO price
+-- movements (everyone treated as DNP, prices frozen per D2), yet it still marks
+-- its round ACTIVE (a round is active if it has >=1 finalised OR abandoned match).
+-- Noted for the locks slice (G4/G6/G10): an abandoned match RELEASES the D7
+-- mid-match trade lock, so a match dying between days cannot freeze trading forever.
+CREATE TYPE match_status  AS ENUM ('scheduled', 'in_progress', 'finalised', 'abandoned');
 CREATE TYPE ledger_kind   AS ENUM ('buy', 'sell');
 CREATE TYPE h2h_outcome   AS ENUM ('home', 'away', 'tie', 'bye');
 CREATE TYPE review_state  AS ENUM ('draft', 'committed');

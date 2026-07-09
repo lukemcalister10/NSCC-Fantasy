@@ -1,6 +1,7 @@
 import type { LeagueConfig, PlayerRole } from "../config/types.js";
 import type { LedgerTxnKind } from "../engines/capLedger.js";
 import type {
+  DerivedH2hResult,
   DerivedState,
   MatchStatus,
   RawScorecard,
@@ -300,8 +301,39 @@ export async function writeDerived(
         [c.fantasyTeamId, c.asOfRoundId, c.capRemaining, c.investedValue, c.teamValue],
       );
     }
-    // team_round_scores / h2h_results / ladder / overall_leaderboard: deferred
-    // engines emit nothing this slice.
+    for (const tr of derived.teamRoundScores) {
+      await db.query(
+        `INSERT INTO team_round_scores
+           (fantasy_team_id, round_id, total, captain_player_id)
+         VALUES ($1,$2,$3,$4)`,
+        [tr.fantasyTeamId, tr.roundId, tr.total, tr.captainPlayerId],
+      );
+    }
+    for (const h of derived.h2hResults) {
+      // h2h_results.id is a physical surrogate (DEFAULT gen_random_uuid); it is
+      // deliberately not part of the derived contract and never read back.
+      await db.query(
+        `INSERT INTO h2h_results
+           (round_id, home_team_id, away_team_id, home_points, away_points, bye_median, outcome)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [h.roundId, h.homeTeamId, h.awayTeamId, h.homePoints, h.awayPoints, h.byeMedian, h.outcome],
+      );
+    }
+    for (const l of derived.ladder) {
+      await db.query(
+        `INSERT INTO ladder
+           (season_id, fantasy_team_id, played, wins, losses, ties, points_for, ladder_points)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [seasonId, l.fantasyTeamId, l.played, l.wins, l.losses, l.ties, l.pointsFor, l.ladderPoints],
+      );
+    }
+    for (const o of derived.overallLeaderboard) {
+      await db.query(
+        `INSERT INTO overall_leaderboard (season_id, fantasy_team_id, total_points)
+         VALUES ($1,$2,$3)`,
+        [seasonId, o.fantasyTeamId, o.totalPoints],
+      );
+    }
 
     await db.query("COMMIT");
   } catch (err) {
@@ -365,13 +397,70 @@ export async function readDerived(
     teamValue: num(r.team_value),
   }));
 
+  const teamRoundScores = (
+    await db.query(
+      `SELECT trs.* FROM team_round_scores trs
+         JOIN fantasy_teams ft ON trs.fantasy_team_id = ft.id
+        WHERE ft.season_id = $1
+        ORDER BY trs.fantasy_team_id, trs.round_id`,
+      [seasonId],
+    )
+  ).rows.map((r) => ({
+    fantasyTeamId: str(r.fantasy_team_id),
+    roundId: str(r.round_id),
+    total: num(r.total),
+    captainPlayerId: strOrNull(r.captain_player_id),
+  }));
+
+  const h2hResults = (
+    await db.query(
+      `SELECT h.* FROM h2h_results h JOIN rounds r ON h.round_id = r.id
+        WHERE r.season_id = $1
+        ORDER BY h.round_id, h.home_team_id`,
+      [seasonId],
+    )
+  ).rows.map((r) => ({
+    roundId: str(r.round_id),
+    homeTeamId: str(r.home_team_id),
+    awayTeamId: strOrNull(r.away_team_id),
+    homePoints: num(r.home_points),
+    awayPoints: numOrNull(r.away_points),
+    byeMedian: numOrNull(r.bye_median),
+    outcome: str(r.outcome) as DerivedH2hResult["outcome"],
+  }));
+
+  const ladder = (
+    await db.query(
+      `SELECT * FROM ladder WHERE season_id = $1 ORDER BY fantasy_team_id`,
+      [seasonId],
+    )
+  ).rows.map((r) => ({
+    fantasyTeamId: str(r.fantasy_team_id),
+    played: num(r.played),
+    wins: num(r.wins),
+    losses: num(r.losses),
+    ties: num(r.ties),
+    pointsFor: num(r.points_for),
+    ladderPoints: num(r.ladder_points),
+  }));
+
+  const overallLeaderboard = (
+    await db.query(
+      `SELECT * FROM overall_leaderboard WHERE season_id = $1 ORDER BY fantasy_team_id`,
+      [seasonId],
+    )
+  ).rows.map((r) => ({
+    fantasyTeamId: str(r.fantasy_team_id),
+    totalPoints: num(r.total_points),
+  }));
+
   return {
     playerMatchScores,
     priceHistory,
     teamCapSnapshots,
-    teamRoundScores: [],
-    h2hResults: [],
-    ladder: [],
-    overallLeaderboard: [],
+    teamRoundScores,
+    h2hResults,
+    ladder,
+    overallLeaderboard,
   };
 }

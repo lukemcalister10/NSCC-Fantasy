@@ -2,6 +2,10 @@ import { CapLedger } from "../engines/capLedger.js";
 import { repriceAfterMatch } from "../engines/pricing.js";
 import { scoreMatch } from "../engines/scoring.js";
 import type { MatchScorecard } from "../types.js";
+import { computeH2hResults } from "./h2h.js";
+import { computeLadder } from "./ladder.js";
+import { computeOverallLeaderboard } from "./overallLeaderboard.js";
+import { computeTeamRoundScores } from "./teamRoundScoring.js";
 import type {
   DerivedCapSnapshot,
   DerivedPlayerMatchScore,
@@ -18,13 +22,15 @@ import type {
  * all state; run twice on equal input it returns byte-identical output. Composes
  * the existing engines (scoreMatch, repriceAfterMatch, CapLedger) unchanged.
  *
- * This slice populates the CORE chain — player match scores, price history, cap
- * snapshots. Team round scores / H2H / ladder are the deferred full-chain slice
- * (G3 + G9) and come back empty here.
+ * The FULL chain is derived here: player match scores, price history and cap
+ * snapshots (core), plus team-round scores (captaincy applied per D10), H2H
+ * results, the ladder and the overall leaderboard (the deferred engines, G3 +
+ * G9). Every family is a pure, deterministic function of RawSeason.
  *
  * Determinism rests on: stable sort keys everywhere (matches by round seq then
- * finalised-at then id; players/teams by id), integer money via the engines'
- * epsilon-guarded rounding, and no wall-clock / random input.
+ * finalised-at then id; players/teams by id; every derived array keyed on the
+ * exact string columns readDerived orders by), integer money/points via the
+ * engines' epsilon-guarded rounding, and no wall-clock / random input.
  */
 
 // scoreMatch requires captain/VC fields, but fantasy captaincy is per-team and we
@@ -147,6 +153,39 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
     });
   }
 
+  // ---- 4. Full chain: team-round scores → H2H → ladder → overall ----------
+  // Active rounds: >=1 finalised OR abandoned match (operator washout convention).
+  // An all-abandoned round is active with all-zero totals (every pairing ties,
+  // the bye ties a median of 0). Scoring above already excludes abandoned
+  // matches, so they contribute no score rows and no price movements (D2).
+  const activeStatuses = new Set(["finalised", "abandoned"]);
+  const activeRoundIds = new Set(
+    raw.matches.filter((m) => activeStatuses.has(m.status)).map((m) => m.roundId),
+  );
+  const activeRoundIdsBySeq = raw.rounds
+    .filter((r) => activeRoundIds.has(r.id))
+    .slice()
+    .sort((a, b) => a.seq - b.seq || cmp(a.id, b.id))
+    .map((r) => r.id);
+
+  const teamIds = raw.fantasyTeams.map((t) => t.id).slice().sort(cmp);
+  const roundIdByMatch = new Map(raw.matches.map((m) => [m.id, m.roundId]));
+
+  const teamRoundScores = computeTeamRoundScores({
+    teamIds,
+    roundIds: activeRoundIdsBySeq,
+    selections: raw.selections,
+    playerMatchScores,
+    roundIdByMatch,
+  });
+  const h2hResults = computeH2hResults({
+    teamIds,
+    activeRoundIdsBySeq,
+    teamRoundScores,
+  });
+  const ladder = computeLadder({ teamIds, teamRoundScores, h2hResults });
+  const overallLeaderboard = computeOverallLeaderboard(teamIds, teamRoundScores);
+
   return {
     playerMatchScores: playerMatchScores.sort(
       (a, b) => cmp(a.matchId, b.matchId) || cmp(a.playerId, b.playerId),
@@ -157,10 +196,10 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
     teamCapSnapshots: teamCapSnapshots.sort(
       (a, b) => cmp(a.fantasyTeamId, b.fantasyTeamId) || cmp(a.asOfRoundId, b.asOfRoundId),
     ),
-    teamRoundScores: [],
-    h2hResults: [],
-    ladder: [],
-    overallLeaderboard: [],
+    teamRoundScores,
+    h2hResults,
+    ladder,
+    overallLeaderboard,
   };
 }
 

@@ -11,9 +11,13 @@ export { startingPrice } from "./engines/startingPrice.js";
 export { CapLedger } from "./engines/capLedger.js";
 export type { LedgerTxn, LedgerTxnKind, Holding } from "./engines/capLedger.js";
 
-// Recompute + persistence (partial G3: scores/prices/cap).
+// Recompute + persistence (full chain: scores/prices/cap + team-round/H2H/ladder/overall).
 export { recomputeSeason } from "./recompute/orchestrator.js";
 export * from "./recompute/types.js";
+// Fixture generation is exported so the UI can render UPCOMING fixtures directly,
+// never by querying the derived h2h_results (operator directive).
+export { generateRound, hasBye } from "./recompute/roundRobin.js";
+export type { Fixture } from "./recompute/roundRobin.js";
 export {
   loadRawSeason,
   writeDerived,

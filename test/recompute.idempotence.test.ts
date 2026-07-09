@@ -10,10 +10,14 @@ import {
 import { makeTestDb, seedSeason } from "./helpers/pgliteDb.js";
 
 /**
- * G3 RECOMPUTE_IDEMPOTENCE (PARTIAL: scores / prices / cap; H2H + ladder are the
- * deferred full-chain slice). Enter a scorecard with a deliberate error, compute,
- * correct it, recompute → derived state byte-identical to the correct-first-time
- * path, with no orphaned derived rows.
+ * G3 RECOMPUTE_IDEMPOTENCE (FULL CHAIN). Enter a scorecard with a deliberate
+ * error, compute, correct it, recompute → ALL derived state (scores, prices,
+ * cap, team-round scores, H2H, ladder, overall leaderboard) byte-identical to
+ * the correct-first-time path, with no orphaned derived rows.
+ *
+ * Two fantasy teams with selections make the whole chain non-empty and let the
+ * error CASCADE: FT2 selects the erroneously-added player X, so X's presence
+ * changes FT2's round total → its H2H points → its ladder/overall standings.
  */
 
 const SEASON = "00000000-0000-0000-0000-000000000001";
@@ -24,13 +28,27 @@ const A = "00000000-0000-0000-0000-0000000000a0";
 const B = "00000000-0000-0000-0000-0000000000b0";
 const X = "00000000-0000-0000-0000-0000000000e0"; // the erroneously-added extra
 const FT1 = "00000000-0000-0000-0000-0000000000f1";
+const FT2 = "00000000-0000-0000-0000-0000000000f2";
 const OWNER = "00000000-0000-0000-0000-00000000000f";
+const OWNER2 = "00000000-0000-0000-0000-0000000000ef";
 const T1 = "00000000-0000-0000-0000-0000000000d1";
 const T2 = "00000000-0000-0000-0000-0000000000d2";
+const SEL1 = "00000000-0000-0000-0000-000000000101";
+const SEL2 = "00000000-0000-0000-0000-000000000102";
+const SEL3 = "00000000-0000-0000-0000-000000000103";
+const SEL4 = "00000000-0000-0000-0000-000000000104";
+const SEL5 = "00000000-0000-0000-0000-000000000105";
 
 /**
  * @param withExtra when true, player X is (wrongly) added to the lineup + batting
  *   — the deliberate error. The correction removes X.
+ *
+ * Base scores (FIXTURE_CONFIG): A = 100 runs + 1 outfield catch·8 = 108; B = 2
+ * wkt·25 = 50; X = 20 runs = 20 (only when withExtra). Selections (same either
+ * way): FT1 = A(C)+B(VC); FT2 = B(C)+A(VC)+X. So:
+ *   FT1 total = A108 + B50 + captain A doubled 108           = 266  (both paths)
+ *   FT2 total = B50 + A108 + X(20|0) + captain B doubled 50
+ *             = 228 with the error, 208 corrected  ← the cascade
  */
 function buildRaw(withExtra: boolean): RawSeason {
   const lineup = withExtra ? [A, B, X] : [A, B];
@@ -72,8 +90,17 @@ function buildRaw(withExtra: boolean): RawSeason {
         dismissals: ["c " + A + " b " + B], // A takes an outfield catch
       },
     ],
-    fantasyTeams: [{ id: FT1, ownerProfileId: OWNER, name: "Team 1" }],
-    selections: [],
+    fantasyTeams: [
+      { id: FT1, ownerProfileId: OWNER, name: "Team 1" },
+      { id: FT2, ownerProfileId: OWNER2, name: "Team 2" },
+    ],
+    selections: [
+      { id: SEL1, fantasyTeamId: FT1, roundId: R1, playerId: A, isCaptain: true, isViceCaptain: false },
+      { id: SEL2, fantasyTeamId: FT1, roundId: R1, playerId: B, isCaptain: false, isViceCaptain: true },
+      { id: SEL3, fantasyTeamId: FT2, roundId: R1, playerId: B, isCaptain: true, isViceCaptain: false },
+      { id: SEL4, fantasyTeamId: FT2, roundId: R1, playerId: A, isCaptain: false, isViceCaptain: true },
+      { id: SEL5, fantasyTeamId: FT2, roundId: R1, playerId: X, isCaptain: false, isViceCaptain: false },
+    ],
     // Round-1 trades at price-entering-round-1 = starting price (Rider 2 holds).
     trades: [
       { id: T1, fantasyTeamId: FT1, kind: "buy", playerId: A, price: 60_000, roundId: R1, createdAt: "2026-09-30T00:00:00Z" },
@@ -107,13 +134,56 @@ describe("G3 RECOMPUTE_IDEMPOTENCE (partial) — object level", () => {
   });
 });
 
-describe("G3 RECOMPUTE_IDEMPOTENCE (partial) — pglite persistence", () => {
+describe("G3 RECOMPUTE_IDEMPOTENCE — full chain cascades and reconciles", () => {
+  it("derives team-round scores, H2H, ladder and overall from the corrected truth", () => {
+    const d = recomputeSeason(buildRaw(false));
+
+    // Team-round totals (captaincy at this layer): FT1 266, FT2 208.
+    expect(d.teamRoundScores).toEqual([
+      { fantasyTeamId: FT1, roundId: R1, total: 266, captainPlayerId: A },
+      { fantasyTeamId: FT2, roundId: R1, total: 208, captainPlayerId: B },
+    ]);
+
+    // Two teams → one H2H fixture (FT1 sorts first → home). 266 > 208 → FT1 win.
+    expect(d.h2hResults).toEqual([
+      { roundId: R1, homeTeamId: FT1, awayTeamId: FT2, homePoints: 266, awayPoints: 208, byeMedian: null, outcome: "home" },
+    ]);
+
+    // Ladder: FT1 1 win (pf 266), FT2 1 loss (pf 208).
+    expect(d.ladder).toEqual([
+      { fantasyTeamId: FT1, played: 1, wins: 1, losses: 0, ties: 0, pointsFor: 266, ladderPoints: 2 },
+      { fantasyTeamId: FT2, played: 1, wins: 0, losses: 1, ties: 0, pointsFor: 208, ladderPoints: 0 },
+    ]);
+
+    expect(d.overallLeaderboard).toEqual([
+      { fantasyTeamId: FT1, totalPoints: 266 },
+      { fantasyTeamId: FT2, totalPoints: 208 },
+    ]);
+  });
+
+  it("the scorecard error visibly moves FT2 down the chain (228 → 208), then reconciles", () => {
+    const errored = recomputeSeason(buildRaw(true));
+    const corrected = recomputeSeason(buildRaw(false));
+    const ft2Total = (d: typeof errored) =>
+      d.teamRoundScores.find((t) => t.fantasyTeamId === FT2)!.total;
+    // X's phantom 20 inflates FT2 before correction...
+    expect(ft2Total(errored)).toBe(228);
+    // ...and correcting-then-recomputing lands on the correct-first-time chain.
+    expect(ft2Total(corrected)).toBe(208);
+    expect(corrected).toEqual(recomputeSeason(buildRaw(false)));
+  });
+});
+
+describe("G3 RECOMPUTE_IDEMPOTENCE (full chain) — pglite persistence", () => {
   it("DB round-trips derived state identical to the recompute output", async () => {
     const db = await makeTestDb();
     await seedSeason(db, buildRaw(false));
     const derived = recomputeSeason(await loadRawSeason(db, SEASON));
     await writeDerived(db, SEASON, derived);
+    // Round-trip covers every family incl. team-round/H2H/ladder/overall.
     expect(await readDerived(db, SEASON)).toEqual(derived);
+    expect(derived.h2hResults.length).toBe(1);
+    expect(derived.ladder.length).toBe(2);
   });
 
   it("recompute replaces derived rows with no orphans after a correction", async () => {
@@ -148,5 +218,18 @@ describe("G3 RECOMPUTE_IDEMPOTENCE (partial) — pglite persistence", () => {
       [X],
     );
     expect(Number(scores.rows[0]!.n)).toBe(0); // no orphaned score row
+
+    // The full-chain tables are rebuilt wholesale — no orphans from the errored
+    // run survive (one H2H fixture + two ladder rows for the two teams, one round).
+    const h2h = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM h2h_results WHERE round_id = $1",
+      [R1],
+    );
+    expect(Number(h2h.rows[0]!.n)).toBe(1);
+    const ladder = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM ladder WHERE season_id = $1",
+      [SEASON],
+    );
+    expect(Number(ladder.rows[0]!.n)).toBe(2);
   });
 });

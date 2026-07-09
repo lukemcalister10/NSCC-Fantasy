@@ -1,94 +1,129 @@
-# NSCC Fantasy Cricket — engine core + persistence
+# NSCC Fantasy Cricket — full derived chain
 
-Club fantasy cricket platform. Two slices landed: the **computational engine core**
-(scoring, pricing, cap ledger, starting price) and now the **Supabase schema +
-persistence + recompute** layer that makes the prime invariant real. Config-driven
-throughout (THE PRIME INVARIANT); verified against the frozen gates.
+Club fantasy cricket platform. Three slices landed: the **computational engine core**
+(scoring, pricing, cap ledger, starting price), the **Supabase schema + persistence +
+recompute** layer, and now the **full derived chain** — team-round scoring (captaincy),
+H2H results, ladder and overall leaderboard — so `recomputeSeason` derives the ENTIRE
+chain byte-identically. Config-driven throughout (THE PRIME INVARIANT); verified
+against the frozen gates.
 
 State-stamp: as-of 2026-07-09 · builds against DEFINITION_OF_DONE v1.1 /
-**DECISION_LOG v1.2** / KICKOFF v1.1 · supersedes commit 531338a. Companion docs
-(`DECISION_LOG.md`, `DEFINITION_OF_DONE.md`, `KICKOFF.md`) now live in the repo for
-cold-acceptance runs.
+**DECISION_LOG v1.2** / KICKOFF v1.1 · supersedes commit 5307187 · default branch is
+now `main`. Companion docs (`DECISION_LOG.md`, `DEFINITION_OF_DONE.md`, `KICKOFF.md`)
+live in the repo for cold-acceptance runs.
 
 ## Plain read + operator decisions (read first)
-- **Branch:** work moved onto `main` (created from `claude/new-session-09z8sk` at
-  531338a — identical content, nothing to merge) per operator instruction. Open
-  item: the GitHub *default branch* is still `claude/new-session-09z8sk`; flipping it
-  to `main` is a repo setting, awaiting confirmation.
-- **G2 "team value" — RESOLVED (A2).** DECISION_LOG is now v1.2: team value =
-  `cap remaining + Σ current prices` (Gate G2 authoritative); `Σ current prices`
-  alone is invested value. Already implemented (`CapLedger.teamValue`); no longer an
-  open question.
-- **Captaincy placement (design call in effect).** The recomputed shared per-player
-  value is `base` (pre-captaincy), which is what pricing keys on (D1/G7). Captain ×2
-  moves to the fantasy-team round layer (a deferred engine) — so **G8 will be
-  re-verified there** in the next slice.
+- **Bye median = median over ALL N teams' round totals, INCLUDING the bye team**
+  (operator decision this session; whole-league "median game"). Odd N (the only case
+  that byes) → true middle, an integer.
+- **Ladder points = win 2 / tie 1 / loss 0** → `ladder_points = 2·wins + ties`
+  (operator-confirmed **structural** convention, not economy config; flagged as a
+  candidate config value if a season ever needs a different scale).
+- **Captaincy now lives at the team-round layer (D10), not `scoreMatch`.** The ×2 is
+  driven by `selections.is_captain / is_vice_captain` — never a scorecard captain
+  field. `base` stays pre-captaincy and still drives pricing (D1/G7). **G8 is
+  re-verified here** (`test/g8.captaincy-team-round.test.ts`).
+- **Washout convention added (operator directive).** `abandoned` is now a
+  `match_status`: a washout produces **no score rows and no price movements**
+  (everyone DNP, prices frozen per D2) but still marks its round **active**. Noted for
+  the locks slice: an abandoned match RELEASES the D7 mid-match trade lock. *This
+  convention is not yet in DECISION_LOG — recommend logging it as a decision (e.g. D19)
+  at the next operator sitting.*
 
 ## Build report (Standing Rule §1)
 
 ### What changed
-- **G11 CONFIG_ECONOMY is now executable** (was asserted). A shared G1 driver plus a
-  second, fully distinct `LeagueConfig` (alternate scoring values, cap, team size,
-  composition) re-run the G1/G2 logic green with **zero change to `src/engines/*` or
-  `src/config/types.ts`** — the proof that the economy is config-driven.
-- **Supabase schema** (`supabase/migrations/0001_init.sql`): the entire derived
-  chain's tables — config/identity, raw truth (registry, rounds, matches,
-  scorecards), raw user actions (teams, selections, trades) and every derived table.
-- **Pure recompute orchestrator** (`src/recompute/`): `recomputeSeason(raw)` composes
-  the existing engines deterministically → player match scores, sequential price
-  history, and cap snapshots. Byte-identical on re-run (basis of G3).
-- **Persistence** (`src/db/repository.ts`): `loadRawSeason` / `writeDerived`
-  (transactional delete-then-insert — no orphaned derived rows) / `readDerived`,
-  verified against **pglite** (in-process Postgres, no Docker).
-- Three riders folded in: price-at-time integrity assert in recompute (loud failure
-  on mismatch); partial unique indexes for ≤1 captain / ≤1 VC per team-round; a
-  `starting_price` COMMENT binding the season-lock (G10) behaviour.
+- **Four deferred engines built** (`src/recompute/`, pure & deterministic, composing
+  the existing engines — **no `src/engines/*` change**):
+  - `teamRoundScoring.ts` — per `(team, round)` Σ of selected players' round-`base`,
+    with **captaincy (D10) applied here**: effective captain = the `is_captain`
+    selection if it has a score row that round, else the `is_vice_captain` selection
+    if it does, else none (both DNP → no double). "DNP" = *no score row at all* (a
+    lineup player always has `played=true`, so absence-of-row is what models a
+    captain who did not play).
+  - `roundRobin.ts` — deterministic repeated round-robin (circle method, ghost slot
+    for odd counts). **`generateRound` is exported** so the UI renders upcoming
+    fixtures directly, never by querying `h2h_results` (operator directive).
+  - `h2h.ts` — derives fixtures per active round; settles on team-round totals; **bye
+    scored against the round median** (all N teams, incl. the bye team).
+  - `ladder.ts` / `overallLeaderboard.ts` — wins/points-for standings (a bye counts
+    as played, settled vs its median) and the separate Σ-round-totals leaderboard.
+- **`recomputeSeason` now derives the ENTIRE chain** and returns all four families
+  populated; `DerivedState`'s `never[]` placeholders became real typed arrays.
+- **Persistence extended** (`src/db/repository.ts`): `writeDerived` INSERTs the four
+  new families (DELETEs already scoped them — no orphans); `readDerived` reads them
+  back with `ORDER BY` matching recompute's emit order exactly, so the pglite
+  round-trip is byte-identical. `h2h_results.id` stays a physical surrogate — never
+  modelled, read back, or compared.
+- **Washout convention** (`match_status` gains `abandoned`): no scores, no price
+  movement, still marks the round active; an all-abandoned round → all-tie outcome.
+- **Determinism**: every derived array is keyed on the exact string columns
+  `readDerived` orders by (not `round.seq`), the one trap that would silently pass
+  object-level idempotence but fail the DB round-trip.
 
-### What did NOT change / is NOT built yet
-- Engines are untouched (that is the G11 proof). No H2H, ladder, or team-round
-  scoring engine yet; those derived tables exist but are unpopulated. No React UI, no
-  RLS/auth wiring, no server-side lock enforcement, no screenshot→LLM transcription.
+### What did NOT change
+- **`src/engines/*` — byte-for-byte untouched** (the standing constraint). Zero-change
+  proof: `git diff --stat 5307187..HEAD -- src/engines` prints **nothing**.
+- No React UI, no RLS/auth wiring, no server-side lock enforcement, no screenshot→LLM
+  transcription. `scoreMatch`'s own captain fields remain (unused by the orchestrator,
+  which reads `base`); captaincy is now proven at the team-round layer instead.
 
 ### Artifacts (by name)
-- `supabase/migrations/0001_init.sql` — full-chain schema.
-- `src/recompute/{types,orchestrator}.ts`, `src/db/repository.ts`.
-- `test/g11.config-economy.test.ts`, `test/fixtures/alt-config.ts`,
-  `test/helpers/{references,pgliteDb}.ts`, `test/recompute.idempotence.test.ts`.
+- Engines: `src/recompute/{roundRobin,teamRoundScoring,h2h,ladder,overallLeaderboard}.ts`;
+  `src/recompute/{orchestrator,types}.ts`; `src/db/repository.ts`; `src/index.ts`;
+  `supabase/migrations/0001_init.sql` (`abandoned` enum value).
+- Gate tests: `test/g8.captaincy-team-round.test.ts`, `test/g9.h2h-bye-ladder.test.ts`,
+  `test/washout.test.ts`, `test/recompute.idempotence.test.ts` (extended to full chain).
 
 ### Gates moved (PROPOSED → DERIVED → BUILT → VERIFIED)
-- **G11** CONFIG_ECONOMY → **VERIFIED** — `test/g11.config-economy.test.ts`.
-- **G3** RECOMPUTE_IDEMPOTENCE → **PARTIAL** (scores / prices / cap byte-identical +
-  no orphaned rows, object-level and via pglite) — `test/recompute.idempotence.test.ts`.
-  H2H + ladder remain, so G3 is not yet fully VERIFIED.
-- Still VERIFIED from the prior slice: G1, G2, G5, G7, G8, G14. **34 tests green.**
+- **G3** RECOMPUTE_IDEMPOTENCE → **VERIFIED** — full chain byte-identical (object-level
+  and pglite) with no orphaned rows across all seven derived families;
+  `test/recompute.idempotence.test.ts`.
+- **G9** BYE_MEDIAN → **VERIFIED** — 5-team H2H round, bye vs round median, ladder +
+  points-for reconciled against a hand-worked example; `test/g9.h2h-bye-ladder.test.ts`.
+- **G8** CAPTAINCY → **RE-VERIFIED at the team-round layer** (captain DNP → VC doubled;
+  both DNP → no double; captain played-but-0 still doubled), driven by selections;
+  `test/g8.captaincy-team-round.test.ts`.
+- Still VERIFIED: G1, G2, G5, G7, G11, G14. **52 tests green** (was 34).
 
 ### Open hypotheses
-- Recompute snapshots the *current* cap position per team (one row at the latest
-  round); per-round cap history is a later refinement if the ladder view needs it.
-- Fantasy captaincy is per-team, so `scoreMatch`'s captain fields are unused by the
-  orchestrator (it reads `base`); confirmed harmless, re-verified at G8-next.
+- Team-round scores are emitted for **active rounds only** (≥1 finalised OR abandoned
+  match); future/empty rounds produce no rows. If the UI wants a full team×round grid
+  including unplayed rounds, that is a display-layer fill, not a recompute change.
+- Home/away is by circle-method orientation (deterministic, balances over a cycle); it
+  labels `outcome` only and never affects W/L. A 2-team league keeps the same team
+  home each round — cosmetic, revisit if it matters.
+- Bye median is **inclusive** of the bye team (operator decision). Even-N leagues never
+  bye, so the lower-median even-count rule is defined but never exercised by a gate.
 
 ### Next action / next slices
-1. **Full-chain G3 + G9 + G8 (re-verified at the team-round layer):** build
-   team-round scoring (captain ×2), H2H results, and ladder engines to populate the
-   remaining derived tables and make recompute byte-identical across the whole chain.
-2. **Locks slice (G4 / G6 / G10):** server-side lock enforcement against
-   `rounds.lock_at` / `matches.status` / `seasons.locked_at`. **Includes the
-   mandatory-captain (≥1) commit-time check** that the partial unique indexes cannot
-   express (Rider 1's other half), and the G10 starting-price materialisation.
-3. **Auth/RLS (G13)** and **transcription guardrail (G12)** against a real Supabase
+1. **Locks slice (G4 / G6 / G10):** server-side lock enforcement against
+   `rounds.lock_at` / `matches.status` / `seasons.locked_at`. **Now also in scope:
+   season lock freezes fantasy-team registration** (fixture determinism depends on a
+   stable team set — accepted trade-off: *no manual matchup adjustment, ever*),
+   **alongside starting-price materialisation** (Rider 3 / G10). Includes the
+   mandatory-captain (≥1) commit-time check (Rider 1's other half) and the **abandoned
+   match RELEASING the D7 mid-match trade lock**.
+2. **Auth/RLS (G13)** and **transcription guardrail (G12)** against a real Supabase
    instance; then the React/Vite app and baseline B1.
+3. **Housekeeping:** log the washout/`abandoned` convention as a DECISION (D19);
+   consider promoting `ladder_points` weights to config if a season needs a different
+   scale.
 
 ### Burn report
-One session: G11 made executable + Supabase schema, persistence and deterministic
-recompute (partial G3) from the engine-core baseline; 8 → 34-ish tests, +pglite; two
-gates moved (G11 VERIFIED, G3 PARTIAL); engines untouched.
+One session: built the four deferred engines (team-round captaincy, round-robin H2H,
+ladder, overall leaderboard) + washout convention, extending `recomputeSeason` to a
+byte-identical FULL chain from the persistence baseline; 34 → 52 tests; three gates
+moved (G3 VERIFIED, G9 VERIFIED, G8 re-verified at the team-round layer);
+`src/engines/*` untouched (diff-proven). Context capacity: ~55% of window used at
+hand-off — comfortable margin remaining; a cold-acceptance run of the full gate suite
+would fit well within a fresh session.
 
 ## Run it
 
 ```bash
 npm install
-npm test          # vitest run — the gate suite (incl. pglite-backed G3)
+npm test          # vitest run — the gate suite (52 tests, incl. pglite-backed full-chain G3)
 npm run typecheck # tsc --noEmit
 ```
 
