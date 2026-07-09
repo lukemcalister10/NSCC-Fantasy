@@ -6,15 +6,13 @@ import {
   REF_MATCH_BOWLING,
 } from "../src/fixtures/reference-scorecards.js";
 import type { MatchScorecard } from "../src/types.js";
+import { referenceTotals } from "./helpers/references.js";
 
 const cfg = FIXTURE_CONFIG.scoring;
 
 /** Extract the `total` (post-captaincy) for each player as a plain object. */
 function totals(card: MatchScorecard): Record<string, number> {
-  const result = scoreMatch(card, cfg);
-  const out: Record<string, number> = {};
-  for (const [player, ps] of result.scores) out[player] = ps.total;
-  return out;
+  return referenceTotals(card, cfg);
 }
 
 describe("G1 REFERENCE_SCORECARD — batting-heavy", () => {

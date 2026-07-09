@@ -41,7 +41,7 @@ describe("G2 CAP_LEDGER — operator worked example, verbatim", () => {
   });
 
   it("buying charges price-at-time, not starting price", () => {
-    const ledger = new CapLedger(1_000_000);
+    const ledger = new CapLedger(FIXTURE_CONFIG.squad.cap);
     ledger.buy("x", 100_000, 1); // starting price
     ledger.sell("x", 150_000, 2); // sold after a rise
     // Re-buying x now costs his current (risen) price, not the original $100,000.
