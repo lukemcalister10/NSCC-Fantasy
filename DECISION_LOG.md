@@ -1,12 +1,14 @@
-# DECISION LOG v1.4, 09/07/2026 (supersedes v1.3; delta = A4 session rulings: D19 washout/abandoned, D20 ladder points 2/1/0, D21 derived fixtures + team-set freeze binding)
+# DECISION LOG v1.6, 09/07/2026 (supersedes v1.5; delta = A6: operator-chosen O4 scoring values, econ per-match floor rule, D1 $/pt restored to $1,000)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
 ### which gate or definition-of-done item it moves.
 
 ## LOCKED
-- D1  Pricing formula: new = (1−α)·old + α·(score × $/pt). α 0.20, $/pt $1,000,
-      round nearest $100, floor $9,000. Floor and α remain config (see O6/O7).
+- D1  Pricing formula: new = (1−α)·old + α·(score × $/pt). α 0.20, $/pt $1,000
+      (A5's $500 halving SUPERSEDED by A6 — the operator's final scoring scale
+      is ×1 integer, so no pairing adjustment is needed), round nearest $100,
+      floor $9,000. Floor and α remain config (see O6/O7).
 - D2  DNP = not named in lineup: 0 fantasy points, price frozen, match excluded
       from pricing history.
 - D3  Played = named in the lineup of a finalised match. Price adjusts even on 0.
@@ -80,12 +82,19 @@
     EXPIRY: season lock.
 - O3 Salary cap. DEFAULT: 1.1 × (team size × club-average starting price),
     computed at lock, rounded to nearest $10,000. EXPIRY: season lock.
-- O4 Scoring values. DEFAULT (for veto): run 1, four +1, six +2, wicket 25,
-    catch 8, keeper catch 8, stumping 10, runout unassisted 10 / assisted 5.
-    EXPIRY: season lock.
-- O5 SR/economy bonus thresholds. DEFAULT: bat +10 if SR ≥ 150 over ≥ 10 balls;
-    bowl +10 if economy ≤ 3.0 over ≥ 3 overs (tune to grade norms from last
-    season's PlayHQ data before locking). EXPIRY: season lock.
+- O4 Scoring values. OPERATOR-CHOSEN DRAFT (A6, 09/07/2026, supersedes the ×2
+    scale): run 1, 50 bonus 10, 100 bonus 20, duck −5, not-out 5, four 1,
+    six 3, wicket 19, maiden 1, 5WI 10, economy bonus = floor(max(0, 0.25 ×
+    (balls bowled − runs conceded))) applied PER MATCH (fractional remainder
+    discarded each game; no min-overs threshold; no penalty above 6/over),
+    outfield catch 10, runout 15 (both kinds), WK catch 10, stumping 15. NO
+    strike-rate bonuses. All per-event values integer; econ floor keeps match
+    scores whole. Calibrated on 25/26 data: BAT 45.2% / BOWL 43.1% / FIELD
+    11.7%. Still open until season lock. EXPIRY: season lock.
+- O5 SR/economy thresholds — SUPERSEDED by O4 draft (09/07/2026): SR bonuses
+    dropped; economy handled as the continuous per-run bonus inside O4. The
+    threshold-style bonus fields remain in the scoring schema (config-driven,
+    set to zero) for the fixture config and any future revival.
 - O6 Price floor. LOCKED at $9,000 for now; flagged revisitable pre-lock.
 - O7 α. LOCKED at 0.20 for now; flagged revisitable pre-lock.
 - O8 Hybrid round map. Cannot decide until fixture release. DEFAULT if fixtures
