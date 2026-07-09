@@ -121,12 +121,22 @@ CREATE TRIGGER trg_trades_midmatch_lock
 -- (a) seasons: once locked, config and locked_at are immutable. On the lock
 --     transition (locked_at NULL -> NOT NULL) EVERY player in the season must
 --     already carry a starting_price (Rider 3 / the 0001 COMMENT binding): the DB
---     refuses to lock a season with any un-materialised seed. The VALUE is
---     computed app-side pre-lock (D4, hand-adjustable); the DB guarantees
---     completeness at the moment of lock, after which recompute reads only the
---     stored value (already true: orchestrator seeds from players.starting_price).
+--     refuses to lock a season with any un-materialised seed. Once completeness
+--     passes the SALARY CAP is computed BY this same lock action (O3/A7):
+--       cap = team_size × mean(starting_price over ALL players), nearest $100.
+--     Prices are materialised at exactly this moment (Rider 3), so the mean is
+--     well-defined; 1.0× (no headroom) — stars are funded by basement filler, a
+--     knowing choice (O3). The computed cap is written into the SAME config jsonb
+--     being frozen, so post-lock it is immutable "as the rest of config" for free
+--     (the OLD.locked_at branch above rejects any later config mutation). After
+--     lock, recompute reads only stored values (orchestrator seeds from
+--     players.starting_price; cap flows from seasons.config).
 -- ===========================================================================
 CREATE FUNCTION enforce_season_lock() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  mean_price numeric;
+  team_size  numeric;
+  computed_cap bigint;
 BEGIN
   IF OLD.locked_at IS NOT NULL THEN
     -- Already locked: settings frozen.
@@ -147,6 +157,16 @@ BEGIN
         'cannot lock season %: one or more players have NULL starting_price; materialise all seeds first (Rider 3 / G10)',
         NEW.id USING ERRCODE = 'check_violation';
     END IF;
+
+    -- O3/A7 cap-at-lock: completeness passed, so mean(starting_price) is
+    -- well-defined over the whole pool. cap = team_size × mean, rounded to the
+    -- nearest $100 with halves UP (D4/G14): floor(x/100 + 0.5) * 100 on the
+    -- positive raw cap. team_size comes from the config being locked.
+    SELECT avg(starting_price) INTO mean_price
+      FROM players WHERE season_id = NEW.id;
+    team_size := (NEW.config #>> '{squad,teamSize}')::numeric;
+    computed_cap := floor((team_size * mean_price) / 100 + 0.5) * 100;
+    NEW.config := jsonb_set(NEW.config, '{squad,cap}', to_jsonb(computed_cap));
   END IF;
   RETURN NEW;
 END $$;

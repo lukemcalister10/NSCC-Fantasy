@@ -1,140 +1,141 @@
-# NSCC Fantasy Cricket — locks slice (G4 / G6 / G10)
+# NSCC Fantasy Cricket — league-config squad + cap-at-lock slice (A7 / O2 / O3)
 
-Club fantasy cricket platform. Four slices landed: the **computational engine core**
+Club fantasy cricket platform. Prior slices landed: the **computational engine core**
 (scoring, pricing, cap ledger, starting price), the **Supabase schema + persistence +
 recompute** layer, the **full derived chain** (team-round scoring, H2H, ladder,
-overall leaderboard), and now **DB-level lock enforcement** — the round lock (G4), the
-mid-match trade lock (G6), and the season lock (G10), plus the mandatory-captain and
-starting-price-materialisation riders. The database is the gatekeeper: every rule is a
-trigger/constraint that runs against pglite in the gate suite exactly as on real
-Supabase, un-bypassable by any future client.
+overall leaderboard), and **DB-level lock enforcement** (round lock G4, mid-match trade
+lock G6, season lock G10 + the mandatory-captain / starting-price riders). This slice
+implements **DECISION_LOG A7 (O2/O3)** ahead of any validation layer — a cheap
+type/schema reshape plus one extension of the season-lock action:
+
+1. **`LeagueConfig.squad` composition reshaped** from exact per-role counts to **role
+   MINIMUMS + total SIZE**, with `flex = teamSize − Σ minimums` (O2/A7). Type/schema
+   only — no selection-validation engine yet (that has no gate).
+2. **Salary cap computed AT SEASON LOCK** (O3/A7): the same lock action, after the
+   starting-price materialisation-completeness check passes, writes
+   `cap = team_size × mean(starting_price)` (nearest $100, halves up) into the frozen
+   config.
+
+The database stays the gatekeeper: the cap is computed inside the season-lock trigger,
+un-bypassable by any client.
 
 State-stamp: as-of 2026-07-09 · builds against DEFINITION_OF_DONE v1.1 /
-**DECISION_LOG v1.7** / KICKOFF v1.1 · continues from commit 8b83903 (main HEAD;
-v1.5–v1.7 resolved economy open items O1–O5 / composition semantics — none touch the
-lock gates, and D19/D20/D21 + Riders 1/3 are unchanged) · default branch is `main`.
-Companion docs (`DECISION_LOG.md`, `DEFINITION_OF_DONE.md`, `KICKOFF.md`) live in the
-repo for cold-acceptance runs.
+**DECISION_LOG v1.7** / KICKOFF v1.1 · continues from commit c6d2b8b (locks slice HEAD)
+· `src/engines/*` untouched (diff-proven below). Companion docs (`DECISION_LOG.md`,
+`DEFINITION_OF_DONE.md`, `KICKOFF.md`) live in the repo for cold-acceptance runs;
+builder process notes in `CLAUDE.md`.
 
 ## Plain read + operator decisions (read first)
-- **The database is the gatekeeper for locks.** All lock enforcement is Postgres
-  triggers/constraints in `supabase/migrations/0002_locks.sql`, so G4/G6/G10 run
-  against pglite like everything else and cannot be bypassed by a client. App-level
-  friendly errors may duplicate these later; the DB stays authoritative.
-- **Write-time vs derive-time.** Lock triggers compare `rounds.lock_at` /
-  `matches.status` / `seasons.locked_at` against `now()` at WRITE time — correct.
-  Recompute stays a pure function of raw data and never consults the clock; `src/`
-  is untouched this slice (diff-proven below).
-- **G4 repair hatch (`app.locks_bypass`).** The round-lock guards (selections/trades
-  ONLY) honour a session GUC `app.locks_bypass` (`current_setting(...,true)`, default
-  off): the manager's escape hatch for a post-lock correction when the recompute
-  price-integrity assert (Rider 2) forces one. No bypass on the mid-match, season,
-  config, starting-price, or team-registration guards. WHO may set the GUC is G13's job.
-- **AUTHORISATION is temporary (until G13/RLS).** These triggers enforce WHEN a write
-  is allowed, not WHO may write — any DB role can trip them. Role-gating arrives with
-  the auth/RLS slice. Known, temporary state.
-- **G6 operational requirement** (also in KICKOFF Definition of Healthy): the mid-match
-  lock bites only once a lineup exists for the in_progress match, so lineups must be
-  entered when a match goes in_progress — day-one entry for two-day matches.
-- **Abandoned releases the mid-match lock (D19), team registration freezes at season
-  lock (D21)** — both now enforced in the DB, both gate-tested.
+- **Two A7 items, done together, before any validation layer.** O2 reshapes the
+  composition type; O3 makes the season-lock action compute the cap. Both are cheap
+  now and awkward later (a stored-config migration), so they land ahead of the
+  selection-validation and app slices that will consume them.
+- **Composition is now MINIMUMS + SIZE, flex derived.** `SquadConfig.composition`
+  (exact per-role counts) becomes `SquadConfig.roleMinimums` (per-role *minimums*)
+  alongside `teamSize`; `flex = teamSize − Σ roleMinimums` is DERIVED, never stored.
+  Strict role counting (an AR never counts toward BAT; flex is the only wildcard);
+  the WK minimum is satisfiable by a WK-role OR a `wk_eligible` player (D9). **No
+  enforcement engine this slice** — composition validation has no gate (named scope
+  for the later selection-validation slice). Type/schema change only.
+- **The cap is computed BY the lock action (DB is the gatekeeper).** O3:
+  `cap = team_size × mean(starting_price over all players)`, nearest $100, halves up
+  (D4/G14), 1.0× with no headroom (stars funded by basement filler — a knowing
+  choice). It is computed inside `enforce_season_lock()` in the SAME transition that
+  freezes the season, immediately AFTER the Rider-3 materialisation-completeness check
+  (so the mean is well-defined), and written into the config jsonb being frozen. It is
+  therefore post-lock immutable "as the rest of config" for free.
+- **`src/engines/*` untouched (diff-proven below).** The engines carry no economy
+  constants; the reshape is confined to `src/config/*` (the type + the fixture) and
+  the cap logic lives in SQL. `git diff -- src/engines` prints nothing.
 
 ## Build report (Standing Rule §1)
 
 ### What changed
-- **New migration `supabase/migrations/0002_locks.sql`** — all lock enforcement, as
-  Postgres triggers/constraints (plpgsql). Six objects:
-  - `enforce_round_lock()` on `selections` **and** `trades` (BEFORE INSERT/UPDATE/
-    DELETE): rejects writes to a round once `now() >= rounds.lock_at`. UPDATE checks
-    **both OLD and NEW** round locks, so a row cannot be moved across the boundary in
-    either direction. Honours the `app.locks_bypass` session GUC (default off) — the
-    G4 repair hatch. NOT on scorecards (G3 "correct the scorecard, recompute" must
-    keep working post-lock).
-  - `enforce_midmatch_trade_lock()` on `trades` (BEFORE INSERT/UPDATE): rejects a
-    buy/sell of any player in the lineup of an `in_progress` match. `finalised` and
-    `abandoned` (D19) both release — the guard fires only on `in_progress`. No bypass.
-  - `enforce_season_lock()` on `seasons` (BEFORE UPDATE): once `locked_at` is set,
-    `config`/`locked_at` are immutable; the lock transition is **refused while any
-    player has a NULL `starting_price`** (Rider 3 / the 0001 COMMENT binding).
-  - `enforce_player_lock()` on `players` (BEFORE UPDATE): post-lock `starting_price`,
-    `role`, `wk_eligible` frozen. INSERT still allowed (mid-season registry additions).
-  - `enforce_team_registration_lock()` on `fantasy_teams` (BEFORE INSERT/DELETE):
-    post-lock the team SET is frozen (D21 — fixture determinism). Name UPDATE untouched.
-  - `enforce_mandatory_captain()` — a **DEFERRABLE INITIALLY DEFERRED** constraint
-    trigger on `selections`: at COMMIT, every `(team, round)` with any selection must
-    have exactly one `is_captain` (Rider 1's "≥1" half; the "≤1" half is 0001's
-    partial unique index). Deferred so a team's selections insert in any order.
-- **Test harness (`test/helpers/pgliteDb.ts`)**: `makeTestDb` now applies **all**
-  `supabase/migrations/*.sql` in filename order (picks up 0002), and `seedSeason` wraps
-  its writes in one transaction so the deferred captain constraint checks the completed
-  seed atomically. No production `src/` change.
+- **`src/config/types.ts`** — `SquadConfig.composition: Record<PlayerRole, number>`
+  (exact counts, "keys sum to teamSize") reshaped to
+  `SquadConfig.roleMinimums: Record<PlayerRole, number>` (per-role minimums; flex =
+  `teamSize − Σ minimums`, derived). Doc comment states the strict-counting and
+  WK/`wk_eligible` semantics (O2/A7/D9) and that enforcement is deferred (no gate).
+  `cap` doc updated to "computed by the season-lock action" (O3).
+- **`src/config/fixture.ts`** — `composition:` → `roleMinimums:` (values unchanged:
+  BAT 2 / WK 1 / BWL 2 / AR 1, summing to teamSize 6 → flex 0, faithful to the DoD
+  fixture). `cap` left as the tunable placeholder overwritten at lock.
+- **`test/fixtures/alt-config.ts`** — same rename (values unchanged; G11 reads only
+  `squad.cap`, so the rename is inert to it).
+- **`supabase/migrations/0002_locks.sql`** — `enforce_season_lock()` extended: in the
+  lock-transition branch, AFTER the NULL-`starting_price` refusal, it computes
+  `avg(starting_price)` over the season's players, multiplies by the config's
+  `teamSize`, rounds to the nearest $100 with halves up
+  (`floor(raw/100 + 0.5) * 100`), and `jsonb_set`s it into `NEW.config` at
+  `{squad,cap}`. Post-lock the existing "config is immutable" guard covers it.
 
 ### What did NOT change
-- **`src/` — byte-for-byte untouched this slice** (recompute stays a pure function of
-  raw data; the clock lives only in the write-time triggers). Zero-change proof:
-  `git status --short` lists no `src/` path; `git diff -- src/recompute src/engines`
-  prints **nothing**. Recompute already seeds price from the stored `starting_price`
-  (`orchestrator.ts:84`, `player.startingPrice ?? floor`) and never re-derives from
-  last-season data — so "recompute reads only stored values post-lock" was already
-  structurally true; 0002 just guarantees the seed is non-null at lock.
-- No React UI, no RLS/auth wiring (G13), no screenshot→LLM transcription (G12).
+- **`src/engines/*` — byte-for-byte untouched.** Zero-change proof:
+  `git diff -- src/engines` prints **nothing**; `git status --short` lists no
+  `src/engines/` path. The engines carry no economy constants (G11), so the reshape
+  never reached them — the only source touched is `src/config/*` (type + fixture),
+  and the cap arithmetic lives in the SQL trigger.
+- No selection-validation engine (composition minimums are unenforced by design this
+  slice), no React UI, no RLS/auth (G13), no transcription (G12).
 
 ### Artifacts (by name)
-- Enforcement: `supabase/migrations/0002_locks.sql`.
-- Harness: `test/helpers/pgliteDb.ts` (all-migrations apply + transactional seed).
-- Gate tests: `test/g4.lock-enforcement.test.ts`, `test/g6.midmatch-trade-lock.test.ts`,
-  `test/g10.season-lock.test.ts`, `test/mandatory-captain.test.ts` — all with
-  hand-worked cases in comments and direct-write (not-UI) rejections.
+- Type reshape: `src/config/types.ts`, `src/config/fixture.ts`,
+  `test/fixtures/alt-config.ts`.
+- Cap-at-lock enforcement: `supabase/migrations/0002_locks.sql`
+  (`enforce_season_lock()`).
+- New gate test: `test/g10.cap-at-lock.test.ts` — locks a seeded season, asserts the
+  written cap equals a hand-computed mean (worked arithmetic in comments:
+  pool $50,000 / $9,000 / $9,000 / $9,100 → mean $19,275 → 6 × $19,275 = $115,650 →
+  halves-up to **$115,700**), and asserts the computed cap is post-lock immutable
+  exactly like the rest of config.
 
 ### Gates moved (PROPOSED → DERIVED → BUILT → VERIFIED)
-- **G4** LOCK_ENFORCEMENT → **VERIFIED** — selection/trade succeed pre-lock, rejected
-  at `lock+1s` via direct write; per-round lock; cross-boundary UPDATE rejected both
-  ways; `app.locks_bypass` permits, default rejects; `test/g4.lock-enforcement.test.ts`.
-- **G6** MIDMATCH_TRADE_LOCK → **VERIFIED** — buy AND sell rejected while `in_progress`;
-  both succeed once `finalised`; both succeed once `abandoned` (D19 release);
-  `test/g6.midmatch-trade-lock.test.ts`.
-- **G10** SEASON_LOCK → **VERIFIED** — pre-lock config change propagates through
-  recompute; lock refused while a seed is NULL then succeeds; post-lock `seasons.config`,
-  `players.starting_price`, and `fantasy_teams` INSERT/DELETE all rejected; recompute
-  seeds from the stored value only; `test/g10.season-lock.test.ts`.
-- **Rider 1 mandatory captain** (both halves) and **Rider 3 starting-price
-  materialisation** enforced in the DB; `test/mandatory-captain.test.ts` + G10 suite.
-- Still VERIFIED: G1, G2, G3, G5, G7, G8, G9, G11, G14. **68 tests green** (was 52).
+- **O2 composition reshape** → **BUILT** (type/schema; no gate — enforcement is the
+  later selection-validation slice's scope). **G11 CONFIG_ECONOMY stays VERIFIED**
+  under the reshaped type (`test/g11.config-economy.test.ts` green).
+- **O3 cap-at-lock** → **VERIFIED** by a new G10-family test
+  (`test/g10.cap-at-lock.test.ts`): the lock action overwrites the placeholder with
+  `team_size × mean(starting_price)` rounded nearest $100 (halves up), and the value
+  is rejected on any post-lock mutation.
+- **G10 SEASON_LOCK stays VERIFIED** — the cap write is additive to the existing lock
+  transition; the full `test/g10.season-lock.test.ts` suite is unchanged and green.
+- Still VERIFIED: G1–G9, G11, G14 + Riders 1/3. **70 tests green** (was 68).
 
 ### Open hypotheses
-- Mid-match membership is via `scorecard_lineup`; the lock is only as good as timely
-  lineup entry (recorded as an operational requirement in KICKOFF Definition of Healthy).
-- `app.locks_bypass` is enforcement-scoped, not authorisation-scoped: until G13 any DB
-  role can set it. G13 must gate both the GUC and who may write at all.
-- Post-lock the `players` guard freezes `starting_price`/`role`/`wk_eligible` but allows
-  INSERT (mid-season additions). If mid-season additions should also be blocked once
-  locked, that's a separate operator call — currently allowed per KICKOFF registry note.
+- **Composition minimums are unenforced.** The reshaped type is inert until the
+  selection-validation slice reads it (strict counting, flex, WK/`wk_eligible`). That
+  slice needs its own gate (composition enforcement currently has none — DECISION_LOG
+  O2 build note).
+- **`teamSize` is read from the config jsonb at lock.** If a future season's stored
+  config ever lacked `squad.teamSize`, the cap would compute as NULL; every current
+  config carries it, and the app writes the whole `LeagueConfig`. A NOT-NULL-ish guard
+  could be added if hand-authored partial configs become a thing.
+- **1.0× cap, no headroom (O3).** Gun-concentration is an accepted knowing choice; if
+  the operator later wants headroom it is a config multiplier, a pre-lock decision.
 
 ### Next action / next slices
-1. **Auth/RLS (G13)** — role-gate WHO may write (manager-only settings/scorecards),
-   wire `profiles.id = auth.users.id`, and authorise/restrict `app.locks_bypass`;
-   **transcription guardrail (G12)**. Both want a real Supabase instance.
-2. **React/Vite app** and baseline **B1** (full round ≤ 30 min operator time).
-3. **Housekeeping:** consider promoting `ladder_points` weights to config if a season
-   needs a different scale (D20 flagged it structural, revisitable).
+1. **Selection-validation slice** — consume `roleMinimums` + `teamSize`: strict role
+   counting, flex remainder, WK-by-`wk_eligible`; give composition enforcement its
+   gate. Also enforce team size and the O1 trades-per-round cap at write time.
+2. **Auth/RLS (G13)** and **transcription guardrail (G12)** — both want real Supabase.
+3. **React/Vite app** and baseline **B1** (full round ≤ 30 min operator time).
 
 ### Burn report
-One session: built `0002_locks.sql` — six trigger/constraint objects enforcing the
-round lock (G4, incl. cross-boundary + `app.locks_bypass` repair hatch), the mid-match
-trade lock (G6, both directions + abandoned release), and the season lock (G10: config
-+ starting-price + team-registration immutability, plus the materialise-at-lock check),
-with the mandatory-captain ≥1 as a deferred constraint trigger. Harness now applies all
-migrations and seeds transactionally. 52 → 68 tests; three gates VERIFIED (G4/G6/G10);
-`src/` untouched (diff-proven). Linchpin (plpgsql + deferrable constraint triggers +
-GUC bypass in pglite) probed green before writing. Context capacity: ~60% of window
-used at hand-off — comfortable margin; a cold-acceptance run of the full 68-test gate
-suite fits within a fresh session.
+One session: reshaped `LeagueConfig.squad` from exact counts to role minimums + size
+(`composition` → `roleMinimums`, flex derived; O2/A7), updated the fixture + alt config
+and the type doc — engines untouched (diff-proven), G11 still green. Extended
+`enforce_season_lock()` to compute the O3 cap (`team_size × mean(starting_price)`,
+nearest $100 halves up) into the frozen config at the lock transition, after the
+Rider-3 completeness check. Added `test/g10.cap-at-lock.test.ts` with hand-worked
+arithmetic ($115,700) and a post-lock-immutability assertion. 68 → 70 tests green;
+typecheck clean. Cheap slice by design (type + one SQL branch + one test); comfortable
+context margin at hand-off.
 
 ## Run it
 
 ```bash
 npm install
-npm test          # vitest run — the gate suite (52 tests, incl. pglite-backed full-chain G3)
+npm test          # vitest run — the gate suite (70 tests, incl. pglite-backed full-chain G3)
 npm run typecheck # tsc --noEmit
 ```
 

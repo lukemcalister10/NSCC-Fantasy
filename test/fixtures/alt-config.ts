@@ -36,8 +36,10 @@ export const ALT_CONFIG: LeagueConfig = {
     startingPriceGamesCap: 4,
   },
   squad: {
+    // Reshaped semantics (A7/O2): role MINIMUMS + total size. Minimums sum to
+    // teamSize 5 → flex 0; G11 reads only squad.cap, so the rename is inert to it.
     teamSize: 5,
-    composition: { BAT: 2, WK: 1, BWL: 1, AR: 1 },
+    roleMinimums: { BAT: 2, WK: 1, BWL: 1, AR: 1 },
     cap: 2_000_000,
     tradesPerRound: 3,
   },
