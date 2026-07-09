@@ -100,3 +100,7 @@ from the settings page; post-lock immutable via UI and API (Gate G10).
 Ladder, scores, and prices correct within 24h of the round's final day; zero manual
 edits to derived state all season; weekly admin ≤ 30 min total (baseline gate B1);
 every anomaly resolved by scorecard correction + recompute, never by patching output.
+- OPERATIONAL REQUIREMENT (locks slice): the mid-match trade lock (G6/D7) bites only
+  once a lineup exists for the in_progress match. Lineups MUST be entered when a match
+  goes in_progress — i.e. day-one entry for two-day matches — or day-1 information can
+  be traded on before the lock engages.

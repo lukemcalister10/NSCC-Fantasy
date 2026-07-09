@@ -1,22 +1,32 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { DbClient } from "../../src/db/repository.js";
 import type { RawSeason } from "../../src/recompute/types.js";
 
-const MIGRATION = fileURLToPath(
-  new URL("../../supabase/migrations/0001_init.sql", import.meta.url),
+const MIGRATIONS_DIR = fileURLToPath(
+  new URL("../../supabase/migrations/", import.meta.url),
 );
 
+/** Every migration file, applied in filename order — exactly as a real run would.
+ *  Picks up 0002_locks.sql (triggers/constraints) alongside 0001_init.sql, so the
+ *  lock gates (G4/G6/G10) execute against pglite like the rest of the suite. */
+function migrationSql(): string[] {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(new URL(f, `file://${MIGRATIONS_DIR}`), "utf8"));
+}
+
 /**
- * Boot an in-process Postgres (pglite, no Docker) with the real migration
+ * Boot an in-process Postgres (pglite, no Docker) with the real migrations
  * applied, exposed through the same `DbClient` surface production uses. This is
- * what makes the DB half of G3 (schema executes; no orphaned derived rows)
- * verifiable in CI / a cold-acceptance run.
+ * what makes the DB half of G3 (schema executes; no orphaned derived rows) and
+ * the lock gates (G4/G6/G10 triggers) verifiable in CI / a cold-acceptance run.
  */
 export async function makeTestDb(): Promise<DbClient> {
   const pg = new PGlite();
-  await pg.exec(readFileSync(MIGRATION, "utf8"));
+  for (const sql of migrationSql()) await pg.exec(sql);
   return {
     async query<T>(sql: string, params?: unknown[]) {
       const r = await pg.query(sql, params as never[]);
@@ -25,8 +35,25 @@ export async function makeTestDb(): Promise<DbClient> {
   };
 }
 
-/** Insert a whole RawSeason (raw truth + config) so recompute can load it. */
+/**
+ * Insert a whole RawSeason (raw truth + config) so recompute can load it. Wrapped
+ * in ONE transaction: the mandatory-captain guard (0002) is a DEFERRABLE INITIALLY
+ * DEFERRED constraint trigger, so a team's selections may be seeded in any order
+ * and the "exactly one captain per (team, round)" check runs once, at COMMIT, over
+ * the completed set. (A real season is registered atomically anyway.)
+ */
 export async function seedSeason(db: DbClient, raw: RawSeason): Promise<void> {
+  await db.query("BEGIN");
+  try {
+    await seedSeasonInner(db, raw);
+    await db.query("COMMIT");
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw err;
+  }
+}
+
+async function seedSeasonInner(db: DbClient, raw: RawSeason): Promise<void> {
   await db.query("INSERT INTO seasons (id, name, config) VALUES ($1,$2,$3)", [
     raw.seasonId,
     "test season",
