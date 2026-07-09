@@ -4,3 +4,9 @@ dist/
 .DS_Store
 coverage/
 .vitest/
+
+# Secrets — keep the template, ignore real env files (0004 relies on the service key
+# staying server-side).
+.env
+.env.*
+!.env.example

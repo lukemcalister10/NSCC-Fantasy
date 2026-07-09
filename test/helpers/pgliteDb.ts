@@ -8,6 +8,56 @@ const MIGRATIONS_DIR = fileURLToPath(
   new URL("../../supabase/migrations/", import.meta.url),
 );
 
+/**
+ * SUPABASE ENVIRONMENT SHIM (TEST-ONLY — never applied on the real project).
+ *
+ * A real Supabase project already ships the `anon` / `authenticated` /
+ * `service_role` roles and an `auth` schema with `auth.uid()` / `auth.role()`.
+ * pglite does not. `0004_rls.sql` (a) references `auth.uid()` in policy
+ * expressions — which must RESOLVE at CREATE POLICY time — and (b) GRANTs to /
+ * REVOKEs from those three roles. This stands that environment up before the
+ * migrations run so the SAME pure-Supabase 0004 executes unchanged in the gate
+ * suite. SUPABASE_LIVE_VERIFY.md documents that this shim is NOT part of the
+ * operator's apply steps (those objects pre-exist on the real project).
+ *
+ * `auth.uid()` is NULL-SAFE by design: current_setting(...,true) returns '' when
+ * the GUC is unset; a bare ''::jsonb throws, so nullif(...) -> NULL keeps the cast
+ * from ever raising (mirrors Supabase's own definition). This matters because the
+ * G4 repair-hatch tests run as the bootstrap superuser with NO jwt claims, and the
+ * manager-gated round-lock now calls app.is_manager() -> auth.uid() on that path.
+ */
+const SUPABASE_SHIM = `
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN NOINHERIT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN NOINHERIT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+  END IF;
+END $$;
+
+CREATE SCHEMA IF NOT EXISTS auth;
+
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid;
+$$;
+
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+    'anon'
+  );
+$$;
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+`;
+
 /** Every migration file, applied in filename order — exactly as a real run would.
  *  Picks up 0002_locks.sql (triggers/constraints) alongside 0001_init.sql, so the
  *  lock gates (G4/G6/G10) execute against pglite like the rest of the suite. */
@@ -26,6 +76,10 @@ function migrationSql(): string[] {
  */
 export async function makeTestDb(): Promise<DbClient> {
   const pg = new PGlite();
+  // The Supabase shim runs FIRST: 0004_rls.sql resolves auth.uid() at CREATE POLICY
+  // time and grants to the anon/authenticated/service_role roles, all of which a real
+  // project already provides but pglite does not.
+  await pg.exec(SUPABASE_SHIM);
   for (const sql of migrationSql()) await pg.exec(sql);
   return {
     async query<T>(sql: string, params?: unknown[]) {
@@ -33,6 +87,47 @@ export async function makeTestDb(): Promise<DbClient> {
       return { rows: r.rows as T[] };
     },
   };
+}
+
+/** A simulated Supabase auth context: the PostgREST connection role plus (for a
+ *  logged-in user) the JWT `sub`. Anon carries no sub. */
+export type AuthCtx = {
+  role: "anon" | "authenticated" | "service_role";
+  sub?: string;
+};
+
+/**
+ * Run `fn` under a simulated Supabase auth context — exactly how PostgREST serves a
+ * request: set `request.jwt.claims`, then `SET LOCAL ROLE` to drop from the
+ * superuser connection to anon/authenticated/service_role so RLS actually applies.
+ * Everything runs in ONE transaction so DEFERRABLE constraint triggers (G15
+ * composition, Rider-1 captain, G15 trade limits) fire under the acting role at
+ * COMMIT — a faithful "write committed as this user" probe. Rolls back and rethrows
+ * on any error (including a failed COMMIT); the LOCAL role/GUC reset automatically.
+ */
+export async function asAuthed<T>(
+  db: DbClient,
+  ctx: AuthCtx,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const claims = JSON.stringify(
+    ctx.sub ? { sub: ctx.sub, role: ctx.role } : { role: ctx.role },
+  );
+  await db.query("BEGIN");
+  try {
+    await db.query("SELECT set_config('request.jwt.claims', $1, true)", [claims]);
+    await db.query(`SET LOCAL ROLE ${ctx.role}`);
+    const out = await fn();
+    await db.query("COMMIT");
+    return out;
+  } catch (err) {
+    try {
+      await db.query("ROLLBACK");
+    } catch {
+      // Transaction already aborted (e.g. a failed COMMIT ended it) — nothing to undo.
+    }
+    throw err;
+  }
 }
 
 /**
