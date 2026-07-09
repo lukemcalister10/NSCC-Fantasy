@@ -1,4 +1,4 @@
-# DECISION LOG v1.2, 09/07/2026 (supersedes v1.1; delta = D8 amendment A2: team value = cap remaining + Σ current prices, per Gate G2)
+# DECISION LOG v1.4, 09/07/2026 (supersedes v1.3; delta = A4 session rulings: D19 washout/abandoned, D20 ladder points 2/1/0, D21 derived fixtures + team-set freeze binding)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -48,7 +48,30 @@
       Vercel/Netlify. Manager role enforced in DB.
 - D17 Data class INTERNAL (Law 11): auth-walled profiles and photos; club/parental
       consent for photos before upload; no public player pages.
-- D18 Bye = round median (subsumed in D11).
+- D18 Bye = round median (subsumed in D11). CLARIFIED A3, 09/07/2026: the median
+      is taken over ALL fantasy teams' round scores that round, INCLUDING the
+      bye team's own. Byes exist only at odd team counts, so this median is
+      always a true integer middle value — no interpolation convention. Known
+      consequence, accepted: the bye team wins only from the top half incl.
+      itself (e.g. top 2 of 5), slightly harsher than a coin-flip matchup.
+
+## LOCKED — SESSION RULINGS OF 09/07/2026 (A4)
+- D19 Washouts/abandonment: 'abandoned' is a match_status. Abandoned matches
+      produce no score rows and no price movements (all players DNP, prices
+      frozen per D2), and RELEASE the D7 mid-match trade lock (enforcement
+      lands in the locks slice). A round is active if it has ≥1 finalised or
+      abandoned match; an all-abandoned round is active with all-zero totals →
+      all pairings tie, bye ties vs median 0. A round with no entered matches
+      does not exist for H2H/ladder/leaderboard purposes.
+- D20 Ladder points: win 2 / tie 1 / loss 0 (ladder_points = 2·wins + ties).
+      Structural convention, not economy config.
+- D21 H2H fixtures are DERIVED, not stored: deterministic round-robin (circle
+      method) over the sorted fantasy-team-id set; generateRound is exported so
+      the UI renders upcoming fixtures by calling it, never by reading
+      h2h_results. BINDING on the G10 slice: season lock freezes fantasy-team
+      registration (fixture determinism requires a stable set). Accepted
+      trade-off, recorded: no manual matchup adjustment, ever. Home/away labels
+      come from circle orientation and never affect results.
 
 ## OPEN — DEFAULTS APPLY AT EXPIRY
 - O1 Trades per round + banking. DEFAULT: 2/round, non-banking. Depends on club
