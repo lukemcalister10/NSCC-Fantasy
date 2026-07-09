@@ -37,8 +37,11 @@ export const FIXTURE_CONFIG: LeagueConfig = {
     startingPriceGamesCap: 4,
   },
   squad: {
+    // Reshaped semantics (A7/O2): role MINIMUMS + total size, flex = size − Σ min.
+    // Fixture keeps the DoD "2 BAT / 1 WK / 2 BWL / 1 AR" as minimums summing to
+    // teamSize 6 → flex 0 (faithful to DEFINITION_OF_DONE §FIXTURE CONFIG).
     teamSize: 6,
-    composition: { BAT: 2, WK: 1, BWL: 2, AR: 1 },
+    roleMinimums: { BAT: 2, WK: 1, BWL: 2, AR: 1 },
     cap: 1_000_000,
     tradesPerRound: 2,
   },

@@ -64,13 +64,25 @@ export interface PricingConfig {
 }
 
 /** Team-composition and cap parameters (O1, O2, O3). Schema only for the engine
- *  core; enforcement of composition lives with the (later) team-selection UI. */
+ *  core; enforcement of composition lives with the (later) selection-validation
+ *  slice — this type carries NO validation logic, only the reshaped shape (A7). */
 export interface SquadConfig {
   /** Total players in a fantasy team (O2). */
   teamSize: number;
-  /** Required count per role (O2). Keys sum to teamSize. */
-  composition: Record<PlayerRole, number>;
-  /** Starting salary cap (O3 / DoD fixture). */
+  /**
+   * MINIMUM required count per role (O2/A7, supersedes the old exact-count
+   * `composition`). Semantics: Σ minimums ≤ teamSize; the remainder
+   *   FLEX = teamSize − Σ minimums
+   * is an unconstrained wildcard fillable by ANY role. Role counting is STRICT —
+   * a player fills only its own role's minimum (an AR never counts toward BAT);
+   * flex is the only wildcard slot. The WK minimum is satisfiable by a WK-role
+   * OR a `wk_eligible` player (D9, the only dual eligibility). Enforcement of
+   * these minimums lands with the later selection-validation slice (no gate yet).
+   */
+  roleMinimums: Record<PlayerRole, number>;
+  /** Salary cap (O3). Computed BY the season-lock action as
+   *  teamSize × mean(starting_price) over the pool, rounded to nearest $100
+   *  (D4). Pre-lock this is a tunable placeholder, overwritten at lock. */
   cap: number;
   /** Trades allowed per round (O1). */
   tradesPerRound: number;
