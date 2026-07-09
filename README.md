@@ -1,173 +1,127 @@
-# NSCC Fantasy Cricket — auth-boundary slice (Gate G13)
+# NSCC Fantasy Cricket — read-only league views (frontend slice 1)
 
-Club fantasy cricket platform. Prior slices landed: the **computational engine core**
-(scoring, pricing, cap ledger, starting price), the **Supabase schema + persistence +
-recompute** layer, the **full derived chain** (team-round scoring, H2H, ladder, overall
-leaderboard), **DB-level lock enforcement** (round lock G4, mid-match trade lock G6, season
-lock G10 + riders), the **A7 squad reshape + cap-at-lock**, and **selection validation**
-(G15). This slice implements **Gate G13** — the **auth boundary**: row-level security
-across the whole schema, so the database enforces WHO may read/write, not just WHEN.
+Club fantasy cricket platform. Prior slices landed the **engine core** (scoring, pricing, cap
+ledger, starting price), the **Supabase schema + persistence + recompute**, the **full derived
+chain** (team-round scoring, H2H, ladder, overall leaderboard), **DB-level lock enforcement**
+(G4/G6/G10 + riders), the **A7 squad reshape + cap-at-lock**, **selection validation** (G15), and
+the **auth boundary** (G13 — RLS across the whole schema). This slice adds the **first frontend**:
+a deployable **React/Vite** app (D16) delivering the **read-only league views** — login, ladder +
+overall leaderboard, player price list, player profile, and rounds/fixtures — every view behind
+Supabase auth (D17/Law 11), authorization done entirely by the **anon-key client + RLS**. **No
+writes, no service-role usage in the app.** The database stays the gatekeeper.
 
-Until now every trigger enforced *when* a write is allowed for **any** database role
-(0002 header, "they enforce WHEN a write is allowed, not WHO"). G13 adds WHO:
-
-1. **RLS on every table, default-deny.** All 20 tables `ENABLE ROW LEVEL SECURITY`; a
-   logged-out (`anon`) client reads **nothing** (D17/Law 11 — privileges revoked, so a read
-   is a hard permission error, not a silent empty set).
-2. **The manager / participant / service split.** The league manager
-   (`profiles.is_league_manager`) has full write on raw-truth / scorecard-family tables;
-   an authenticated participant reads league data and writes **only their own** team's
-   selections and trades (`owner_profile_id = auth.uid()`); **derived** tables take **no**
-   client writes at all (recompute writes them via the service role); `profiles` is
-   self-readable/updatable for display fields only, and `is_league_manager` is settable by
-   **no** client path (Decision 4).
-3. **Lock-gated cross-visibility** (Decision 3): a team's own selections/trades are always
-   visible to its owner; others' become visible to all authed users only after **that
-   round's `lock_at`** passes, then forever; the manager sees everything always.
-4. **The `app.locks_bypass` GUC is authorised** (requirement 3): the G4 round-lock hatch is
-   honoured **only** when the acting user is a league manager (superuser/service backend, or
-   an authed manager). Bypass set by a non-manager is ignored → the locked-round write is
-   rejected.
-
-The database stays the gatekeeper (D16): the whole boundary is Postgres RLS + a handful of
-`SECURITY`-scoped helpers, tested in pglite by **simulating the Supabase auth context**
-(`SET ROLE` + `request.jwt.claims`) so G13's cases run in the gate suite like everything
-else. Honest label (Law 1): **G13 = VERIFIED (pglite-simulated auth); live confirmation
-pending** via `SUPABASE_LIVE_VERIFY.md`.
-
-State-stamp: as-of 2026-07-09 · builds against KICKOFF **v1.2** / DEFINITION_OF_DONE
-**v1.2** / DECISION_LOG v1.7 · continues from `main @ b938cdc` · `src/engines/*` and
-`src/recompute/*` untouched (diff-proven below).
+State-stamp: as-of 2026-07-09 · builds against KICKOFF **v1.2** / DEFINITION_OF_DONE **v1.2** /
+DECISION_LOG v1.7 · continues from `main @ 3ef8a85` (logo under `Assets/`; G13 live-confirmed) ·
+`src/engines/*`, `src/recompute/*`, `supabase/migrations/*` **untouched** (diff-proven below).
 
 ## Plain read + operator decisions (read first)
 
-- **Four binding decisions (pre-set this session), honoured verbatim:** (1) profiles read =
-  the enumerated set `{id, display_name, photo_path, is_league_manager}` of every profile,
-  future columns private by default; (2) participants self-register their own team
-  (INSERT/UPDATE where `owner = auth.uid()`, name-only, one team per profile per season as a
-  unique index); (3) selections/trades cross-read is lock-gated; (4) `is_league_manager` has
-  **no** client write path for any role.
-- **Two sub-details, operator-answered — both "Option 1", recorded:** profiles readable set
-  **includes `id`** (the row key, already exposed via `fantasy_teams.owner_profile_id`;
-  "private by default" governs data-bearing columns); the two per-team derived tables
-  (`team_cap_snapshots`, `team_round_scores`) are **all-authed read** like the standings
-  (cap state is derivable from lock-gated trades once rounds lock; rows only exist
-  post-recompute, so no pre-lock leak).
-- **Approved rider:** 0004 carries the `UNIQUE(season_id, owner_profile_id)` enforcement
-  **as an index**, with a G13 case that a second self-registration is rejected on the
-  constraint. 0001 already declares it as a table UNIQUE constraint (index-backed); 0004
-  adds an **idempotent guard** that guarantees the index and is a **no-op** on the standard
-  schema (never a duplicate).
-- **Two acknowledgements:** draft-scorecard authed-readability is accepted this slice
-  (refined with G12); participant team-DELETE is manager-only by design.
-- **Adversarial validation applied before coding.** A plan-review pass caught a headline
-  bug in the draft: a fully-`SECURITY DEFINER` `is_manager()` returns true for **everyone**
-  (inside a definer function `current_user` = the owner = superuser). Fixed by **splitting**:
-  `app.is_manager()` is **INVOKER** (the role check runs as the acting role), delegating only
-  the `profiles`-flag read to a tiny **DEFINER** helper. Also folded in: null-safe
-  `auth.uid()`, explicit SELECT policies on every readable table, per-command
-  selections/trades/fantasy_teams policies, explicit `service_role` grants, and `seasons`
-  DELETE withheld even from managers (cascade risk).
+- **Scope (kickoff):** read-only league views ending in a deployable React/Vite app; auth via
+  Supabase (magic link **and** email+password, which the seeded test users have); anon client +
+  RLS does all authorization; **no write paths, no service-role in the app**. Design brief binding.
+- **Player photos (asked & answered):** the schema has no `players.photo_path` / storage bucket,
+  and this slice must leave `supabase/migrations` untouched — so photos render as **monogram
+  avatars on NSCC blue**, and real `players.photo_path` + storage bucket + storage RLS + upload
+  are deferred to the **manager-backend slice** (uploader and column belong together). The photo
+  slot is a fixed square so a real `<img>` drops in later with **zero layout change**.
+- **Verification path (operator refusal, honoured):** no secrets provided — no `SUPABASE_DB_URL`,
+  no service-role, no test-user passwords. So the seed is an **SQL-editor paste** (not a local
+  script), and **live-authed render is verified by the operator via `VERCEL_DEPLOY.md`** (the
+  smoke test). In-repo I verified: `npm run build` clean, the **logged-out boundary** (Playwright:
+  every protected route redirects to `/login`), the **seed through the full trigger stack** (pglite),
+  and the **authed views render** against seed-shaped data (Playwright, no page errors).
+- **Seed riders (A + B):** the seed is a **pair** — `seed_raw.sql` (raw truth) + `seed_derived.sql`
+  (the derived rows **computed by `recomputeSeason` in-process** and serialized — prime invariant
+  D15/G3, never hand-written). The raw seed passes the **live trigger stack legitimately**: future
+  `lock_at`, legal within-cap squads, a captain per team-round; **no bypass** (verified in pglite).
+- **Display note (D21):** pre-season-lock, fixtures render with a **"provisional"** label — the
+  team set can change until lock, so the derived schedule is not yet final.
+- **This slice moves no DoD gates** (B1 later; not G12).
 
 ## Build report (Standing Rule §1)
 
 ### What changed
-- **`supabase/migrations/0004_rls.sql`** (new) — the whole auth boundary as pure-Supabase
-  DDL:
-  - `app` schema helpers: `_profile_is_manager()` (DEFINER — reads the flag bypassing
-    profiles RLS/column-grants/recursion), `is_manager()` (**INVOKER** — `rolsuper` ∨
-    `current_user='service_role'` ∨ the flag), `owns_team(uuid)`, `round_locked(uuid)`.
-  - `ENABLE ROW LEVEL SECURITY` + per-command policies on all 20 tables (matrix below).
-  - `profiles` column-level GRANTs (read `{id, display_name, photo_path, is_league_manager}`;
-    update `{display_name, photo_path}` only — `is_league_manager` in no authed grant).
-  - `CREATE OR REPLACE enforce_round_lock()` — the bypass line now requires `app.is_manager()`
-    (0002 left untouched; the existing triggers rebind by name).
-  - `fantasy_teams` name-only participant-UPDATE trigger + the idempotent unique-index guard.
-  - `REVOKE ALL … FROM anon` and `GRANT ALL … TO service_role` on all public tables.
-- **`test/helpers/pgliteDb.ts`** — a test-only **Supabase shim** (the 3 roles, `service_role
-  BYPASSRLS`, `auth` schema + null-safe `auth.uid()`/`auth.role()`) applied **before** the
-  migrations, plus `asAuthed(db, {role, sub}, fn)` which runs a probe under `SET LOCAL ROLE`
-  + `request.jwt.claims` in one transaction (so deferred G15/captain checks fire under the
-  acting role at COMMIT).
-- **`test/g13.auth-boundary.test.ts`** (new) — 11-case pglite gate, hand-worked
-  accept/reject with specific-message assertions.
-- **`SUPABASE_LIVE_VERIFY.md`** (new) — operator runbook: apply 0001→0004; the Supabase-only
-  `auth.users` FK + `handle_new_user` wiring (fulfils the 0001 forward-reference, kept out of
-  the migrations so pglite stays green); the `is_league_manager` promotion entry; a numbered
-  live checklist mirroring the gate, with the "SQL editor bypasses RLS → drop role" gotcha
-  called out.
-- **`.env.example`** (new) + `.gitignore` — URL/anon placeholders; service-role key named
-  but never requested; real `.env*` ignored.
+- **The React/Vite app under `app/`** (new): `main.tsx` (React Query + Router providers),
+  `App.tsx` (routes + `<RequireAuth>` guard), `auth/` (`AuthProvider` session context +
+  `RequireAuth` D17 guard), `lib/` (`supabase.ts` anon client, `queries.ts` typed read hooks,
+  `format.ts`), `components/` (`AppShell`, `BroadcastPanel`, `RoleBadge`, `PriceMovement`,
+  `PlayerAvatar` photo-ready slot, states), `routes/` (`Login`, `Ladder`, `Players`,
+  `PlayerProfile`, `Rounds`), `styles/` (`tokens.css` design tokens + `components.css`),
+  `assets/nscc-logo.avif`.
+- **Toolchain (new/edited):** `index.html`, `vite.config.ts`, `tsconfig.app.json`, `public/favicon.svg`;
+  `package.json` gains React/Vite/Supabase/React-Query deps + `dev`/`build`/`preview`/`seed:generate`
+  scripts (existing `test`/`typecheck` untouched); `.env.example` gains `VITE_` vars (public defaults).
+- **Seed (new):** `scripts/generate-seed.ts` builds one demo `RawSeason`, runs the real
+  `recomputeSeason`, and emits **`supabase/seed/seed_raw.sql` + `supabase/seed/seed_derived.sql`** —
+  idempotent, trigger-legal, engine-derived.
+- **`VERCEL_DEPLOY.md`** (new): operator runbook to the post-G13 standard — dashboard-first from a
+  fresh Vercel account, seed step, env-var setup, Supabase redirect-URL wiring, a numbered smoke
+  test ending at a preview URL.
 
 ### What did NOT change
-- **`src/engines/*` and `src/recompute/*` — byte-for-byte untouched.** Proof:
-  `git diff -- src/engines src/recompute` prints **nothing**. The boundary is entirely RLS +
-  SQL helpers; recompute keeps writing derived state as the trusted backend (service role /
-  superuser), which bypasses RLS by design.
-- **0002 / 0003 migrations untouched.** `enforce_round_lock` is superseded by a
-  `CREATE OR REPLACE` in 0004 (append-only discipline); the existing triggers pick up the new
-  body automatically.
-- No React UI; no G12 transcription; no selections-vs-holdings cross-check.
+- **`src/engines/*`, `src/recompute/*`, `supabase/migrations/*` — byte-for-byte untouched.** Proof:
+  `git diff -- src/engines src/recompute supabase/migrations` prints **nothing**. The app only
+  imports the pure `generateRound` (D21) from `src/recompute/roundRobin.ts`; the seed generator
+  imports `recomputeSeason`/`FIXTURE_CONFIG` — imports, not edits.
+- No writes, no service-role in the app; no G12 transcription; no admin; no selections/holdings
+  cross-check. Player photos not modelled (deferred, see decisions).
 
-### Policy matrix (table × role × operation)
-`A`=any authenticated · `M`=manager · `O`=owner · `L`=round locked · `S`=service/superuser
-only · `∅`=no client path. **anon = nothing (revoked) on every table.**
+### Design tokens (from the binding brief)
+Clean-modern base (`--surface` white, `--border` hairline, generous `--sp-*`); **NSCC blue
+`#193889` the sole accent**; the **broadcast treatment** (navy `#0d1b45` / chrome `#193889`)
+**reserved for the ladder header + score readouts only**; green `#1a7f4b` up / red `#c23a3a` down
+movement; role-badge tints; mobile-first (phone base, `min-width` scale-ups). SuperCoach density on
+the player list (avatar · role badge · price · ▲/▼ movement · per-row stats).
 
-| Table(s) | SELECT | INSERT | UPDATE | DELETE |
-|---|---|---|---|---|
-| `seasons` | A | M | M | ∅ (cascade risk) |
-| `profiles` | A, cols `{id,display_name,photo_path,is_league_manager}` | ∅ (signup) | self, cols `{display_name,photo_path}` | ∅ |
-| raw-truth ×8 (`players`,`rounds`,`matches`,`scorecards`,`scorecard_lineup`,`batting_lines`,`bowling_lines`,`dismissals`) | A | M | M | M |
-| `fantasy_teams` | A | M∨O | M∨O + name-only trigger | M |
-| `selections`,`trades` | M∨O∨L | M∨O | M∨O | M∨O |
-| derived ×7 (`player_match_scores`,`price_history`,`team_cap_snapshots`,`team_round_scores`,`h2h_results`,`ladder`,`overall_leaderboard`) | A | S | S | S |
-
-### Gates moved (PROPOSED → DERIVED → BUILT → VERIFIED)
-- **G13 AUTH_BOUNDARY** → **VERIFIED (pglite-simulated auth)** by
-  `test/g13.auth-boundary.test.ts` — manager writes pass; cross-team writes rejected;
-  non-manager raw-truth writes rejected; derived client writes rejected (service_role
-  passes); anon reads denied; bypass-without-manager rejected; lock-gated cross-read; profiles
-  self-service; one-team-per-season. **Live confirmation pending** (`SUPABASE_LIVE_VERIFY.md`).
-- **G4 / G6 / G10 / G15 / Rider 1 stay VERIFIED, untouched** — they run as the superuser,
-  which bypasses RLS; the manager-gated bypass keeps G4's repair-hatch cases green
-  (superuser → `is_manager()` true). **93 tests green** (was 82; +11 G13 cases).
+### Gates moved
+- **None.** This slice moves no DoD gate (as scoped). G4/G6/G10/G13/G15 stay VERIFIED, untouched
+  (the app is read-only; RLS/triggers run server-side). **93 engine tests stay green; typecheck
+  clean; `npm run build` clean.**
+- **Slice definition of done:** `npm run build` clean ✅; logged-out sees only login ✅ (Playwright);
+  seed passes the live trigger stack ✅ (pglite) and the authed views render ✅ (Playwright, seed-
+  shaped data). **All pages render live Supabase data as an authed test user** → **operator-verified
+  via `VERCEL_DEPLOY.md`** (secrets withheld by design; runbook ends at the preview URL).
 
 ### Open hypotheses
-- **Draft vs committed scorecard visibility** — all raw truth is authed-readable this slice
-  (accepted); refining who sees `scorecards.review_state = 'draft'` rides with **G12**.
-- **Profile provisioning is out-of-band** — the client has no `profiles` INSERT; a signup
-  `handle_new_user` trigger (runbook, Supabase-only) creates the row. A `fantasy_teams`
-  INSERT depends on that row existing (FK), as it will post-signup.
-- **Enforcement triggers under RLS** — the G15/captain/mid-match triggers aggregate a team's
-  own rows, always visible to the owner; the boundary holds only because raw-truth is
-  authed-readable and own-rows are owner-visible. Proven by case 2 committing a full squad as
-  a participant.
+- **Live-authed render is operator-confirmed, not builder-confirmed** — no test-user credentials or
+  DB secrets were provided (by choice). The in-repo checks (build, boundary, DB-seed, mocked-data
+  render) de-risk it; the `VERCEL_DEPLOY.md` smoke test closes it.
+- **Season auto-pick** — the app renders the most-recent `seasons` row. Fine while the live DB holds
+  one season; a season switcher is a later concern.
+- **Player photos deferred** — rides with the manager-backend slice (column + bucket + upload).
 
 ### Next action / next slices
-1. **Operator: run `SUPABASE_LIVE_VERIFY.md`** against the live project to flip G13 to
-   live-confirmed (and record the promotion runbook entry in use).
-2. **G12 transcription guardrail** — LLM scorecard → review → commit; folds in draft-visibility.
-3. **React/Vite app** + baseline **B1**; **selections-vs-holdings** cross-check.
+1. **Operator: run `VERCEL_DEPLOY.md`** (seed the pair, deploy, smoke test) → records the preview URL
+   and flips the slice's live-render item to confirmed.
+2. **Manager backend**: scorecard entry/review, player registry + **photo upload** (`players.photo_path`
+   + storage bucket + RLS), settings, recompute trigger.
+3. **G12 transcription guardrail**; **B1 baseline**.
 
 ### Burn report
-One session: added `0004_rls.sql` (RLS on all 20 tables, `app` helper predicates with the
-INVOKER/DEFINER split, column-scoped profiles, manager-gated bypass, the idempotent unique
-index, anon lockout + service-role grants); a test-only Supabase shim + `asAuthed` harness;
-the 11-case G13 gate; the live-verify runbook + `.env.example`. Adversarial pre-review caught
-the DEFINER `is_manager` auth hole before coding. Engines/recompute untouched (diff-proven).
-82 → 93 tests green; typecheck clean.
+One session: scaffolded a React/Vite/TypeScript app at the repo root (React Query + React Router +
+Supabase anon client, CSS-token design system); built login (magic link + password), ladder +
+leaderboard (broadcast header), SuperCoach player list, player profile (sparkline + scores), and
+rounds/fixtures (derived via `generateRound`, provisional label); wrote a recompute-derived,
+trigger-legal, idempotent SQL seed pair + generator; wrote `VERCEL_DEPLOY.md`. Verified build clean,
+93 engine tests green, the logged-out boundary and authed render via Playwright, and the seed through
+the full pglite trigger stack. Engines/recompute/migrations untouched (diff-proven).
 
 ## Run it
 
 ```bash
 npm install
-npm test          # vitest run — the gate suite (93 tests, incl. pglite-backed G3/G4/G6/G10/G13/G15)
-npm run typecheck # tsc --noEmit
-git diff -- src/engines src/recompute   # empty — zero-change proof
+npm run dev        # Vite dev server (reads VITE_SUPABASE_* from .env)
+npm run build      # tsc -p tsconfig.app.json --noEmit && vite build → dist/  (must be clean)
+npm run seed:generate   # regenerate supabase/seed/seed_raw.sql + seed_derived.sql
+
+npm test           # vitest run — the engine gate suite (93 tests)
+npm run typecheck  # tsc --noEmit (engine)
+git diff -- src/engines src/recompute supabase/migrations   # empty — zero-change proof
 ```
 
-Live auth confirmation: follow `SUPABASE_LIVE_VERIFY.md` against the real Supabase project.
+Deploy: follow **`VERCEL_DEPLOY.md`** (seed → import repo → env vars → Supabase redirect URLs →
+deploy → smoke test → preview URL). Live auth boundary confirmation: **`SUPABASE_LIVE_VERIFY.md`**.
 
 ## Status vocabulary (Standing Rule §3)
-PROPOSED → DERIVED → BUILT → VERIFIED → APPROVED. "Done" is banned. VERIFIED requires the
-named gate and its verifying artifact. APPROVED is the operator's.
+PROPOSED → DERIVED → BUILT → VERIFIED → APPROVED. "Done" is banned. VERIFIED requires the named gate
+and its verifying artifact. APPROVED is the operator's.

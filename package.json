@@ -3,16 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Club fantasy cricket platform — computational engine core (scoring, pricing, cap ledger).",
+  "description": "Club fantasy cricket platform — computational engine core (scoring, pricing, cap ledger) + read-only league views (React/Vite).",
   "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.app.json --noEmit && vite build",
+    "preview": "vite preview",
+    "seed:generate": "tsx scripts/generate-seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "@tanstack/react-query": "^5.59.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
     "@types/node": "^26.1.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
+    "vite": "^5.4.11",
     "vitest": "^2.1.8"
   }
 }
