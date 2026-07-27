@@ -80,7 +80,7 @@ INSERT INTO dismissals (scorecard_id, seq, raw_text) VALUES
 ('5cad0000-0000-4000-8000-000000000001', 3, 'run out (p10)');
 
 INSERT INTO fantasy_teams (id, season_id, owner_profile_id, name) VALUES
-('7ea70000-0000-4000-8000-000000000001', '0c02363e-dacd-4c44-9d0d-8d16346a1958', '__OWNER_A__', 'Northcote Nomads'),
+('7ea70000-0000-4000-8000-000000000001', 'c419757a-055b-4788-a917-b28eb2ce58ee', '__OWNER_A__', 'Northcote Nomads'),
 ('7ea70000-0000-4000-8000-000000000002', 'd2d1a6c1-93fc-4406-810d-543cd0362efa', '__OWNER_B__', 'Southbank Strikers'),
 ('7ea70000-0000-4000-8000-000000000003', '6136e8bf-5b1c-426e-84ac-47036d275263', '__OWNER_C__', 'Eastfield Emus'),
 ('7ea70000-0000-4000-8000-000000000004', '7f1da6ed-2c2b-4dac-92a4-4270c90b4e86', '__OWNER_D__', 'Westgate Warriors');
