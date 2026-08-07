@@ -1,12 +1,22 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { useIsManager } from "../lib/queries";
 import logoUrl from "../assets/nscc-logo.avif";
 
+/**
+ * Participant entries — always visible to any signed-in user. `/team/trades` is
+ * deliberately absent: it resolves by URL, but the team/trade slice (S-C) owns
+ * where trades surface and may place them inside /team rather than beside it.
+ */
 const NAV = [
   { to: "/", label: "Ladder", end: true },
   { to: "/players", label: "Players", end: false },
   { to: "/rounds", label: "Rounds", end: false },
+  { to: "/team", label: "My Team", end: false },
 ];
+
+/** Manager-only entry. Hiding it is cosmetic; RLS (0004) is the boundary (G13). */
+const ADMIN_NAV = { to: "/admin", label: "Admin", end: false };
 
 /**
  * App chrome: a white top bar (hairline border) with the club logo on white and
@@ -17,6 +27,8 @@ const NAV = [
 export function AppShell() {
   const { session, signOut } = useAuth();
   const email = session?.user?.email ?? "";
+  const { data: isManager } = useIsManager();
+  const items = isManager ? [...NAV, ADMIN_NAV] : NAV;
 
   return (
     <div className="shell">
@@ -35,7 +47,7 @@ export function AppShell() {
             </div>
           </div>
           <nav className="nav" aria-label="Primary">
-            {NAV.map((item) => (
+            {items.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

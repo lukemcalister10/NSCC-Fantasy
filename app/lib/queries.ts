@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
+import { useAuth } from "../auth/AuthProvider";
 import { generateRound } from "../../src/recompute/roundRobin";
 import type { PlayerRole } from "../../src/config/types";
 
@@ -108,6 +109,39 @@ export interface RoundView {
 }
 
 const STALE = 60_000; // 1 min; read-only league data changes on recompute cadence
+
+// ── Manager flag (client-side chrome only; RLS is the authority) ────────────
+
+/**
+ * Reads `profiles.is_league_manager` for the signed-in user. This exists ONLY to
+ * decide what chrome to draw (the admin nav entry, the /admin/* guard). It is NOT
+ * an authorization check: authorization is migration 0004's RLS via
+ * `app.is_manager()`, and G13 is what proves it. A user who defeats this read
+ * gains nothing — every admin write is refused by the database.
+ *
+ * `is_league_manager` is inside the column-scoped SELECT grant 0004 hands
+ * `authenticated`, so this read is legitimate for any signed-in user.
+ * `maybeSingle()` because a profile row may not be provisioned yet: no row is
+ * "not a manager", not a thrown error.
+ */
+export function useIsManager() {
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  return useQuery({
+    queryKey: ["is-manager", userId],
+    enabled: !!userId,
+    staleTime: STALE,
+    queryFn: async (): Promise<boolean> => {
+      const res = await supabase
+        .from("profiles")
+        .select("id,is_league_manager")
+        .eq("id", userId!)
+        .maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      return res.data?.is_league_manager === true;
+    },
+  });
+}
 
 // ── Season (auto-pick the most-recent) ──────────────────────────────────────
 
