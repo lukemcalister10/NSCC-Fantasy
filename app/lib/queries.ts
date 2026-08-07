@@ -105,7 +105,17 @@ export interface RoundView {
     status: string;
     final_day_date: string | null;
   }[];
-  fixtures: { home: string; away: string | null }[]; // team NAMES (bye = away null)
+  /**
+   * Derived schedule (D21) — team NAMES for display plus their ids, so a round's
+   * settled RESULT can be matched onto the fixture it belongs to. `away === null`
+   * is a BYE: that team is scored against the round median (D18), not idle.
+   */
+  fixtures: {
+    home: string;
+    away: string | null;
+    homeId: string;
+    awayId: string | null;
+  }[];
 }
 
 const STALE = 60_000; // 1 min; read-only league data changes on recompute cadence
@@ -360,6 +370,8 @@ export function useRounds(seasonId: string | undefined) {
         const fixtures = generateRound(teamIds, r.seq - 1).map((f) => ({
           home: nameById.get(f.home) ?? "—",
           away: f.away === null ? null : (nameById.get(f.away) ?? "—"),
+          homeId: f.home,
+          awayId: f.away,
         }));
         return {
           id: r.id,

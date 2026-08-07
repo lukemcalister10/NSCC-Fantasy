@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.app.json --noEmit && vite build",
     "preview": "vite preview",
     "seed:generate": "tsx scripts/generate-seed.ts",
+    "seed:generate:odd": "tsx scripts/generate-seed-odd.ts",
     "recompute": "tsx scripts/recompute.ts",
     "test": "vitest run",
     "test:watch": "vitest",
