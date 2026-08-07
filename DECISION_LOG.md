@@ -1,4 +1,4 @@
-# DECISION LOG v1.8, 07/08/2026 (supersedes v1.7; delta = A9: name-normalisation rule D22; registry-seed provenance D23; Rider on D4 starting-price economy approximation; O2/O3 illustrations refreshed against the real 25/26 pool)
+# DECISION LOG v1.9, 07/08/2026 (supersedes v1.8; delta = A10: scorecard freeze policy D24; dismissal fielder identification D25; second-innings multiplier added to O4; C1 closed)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -132,6 +132,45 @@
       ($29,800) scores meaningfully — the WK slot is close to a forced pick.
       Widening wk_eligible when the 26/27 pool is finalised is the cheap remedy.
 
+## LOCKED — OPERATOR RULINGS OF 07/08/2026 (A10)
+- D24 SCORECARD FREEZE. A round's scorecards are amendable until the operator
+      manually ENDS LOCKOUT for that round; from that moment they are FROZEN and
+      no correction is made, even if an error is later discovered. Rationale
+      (operator, verbatim in substance): once lockout ends, participants trade on
+      prices derived from those scorecards, so a retrospective correction would
+      change past match results with hindsight, move prices retrospectively, and
+      potentially invalidate trades already made. The cost of a wrong scorecard
+      standing is accepted as smaller than the cost of that cascade.
+      THIS DOES NOT WEAKEN THE PRIME INVARIANT (D15). Derived state remains fully
+      recomputable and byte-identical on re-run (G3); the policy governs whether
+      RAW data may be edited, not whether derived state is derived. A frozen
+      wrong scorecard recomputes to the same wrong answer every time, which is
+      correct behaviour.
+      CONSEQUENCE, recorded: purchase prices and cap balances can never be
+      retrospectively invalidated, because the prices they were struck at can
+      never move. No trade can go bad after the fact.
+      ESCAPE HATCH: a frozen scorecard may be amended ONLY by a deliberate,
+      logged operator override (who, when, why), for catastrophic errors such as
+      an innings recorded against the wrong team. Frozen by default in policy and
+      in the UI; overridable by explicit action, never silently.
+- D25 DISMISSAL FIELDER IDENTIFICATION. Fielders named in dismissal strings are
+      identified by the SAME canonical player identifier used for batting and
+      bowling lines, resolved at entry time (D22 normalise → registry lookup).
+      An unresolved fielder name BLOCKS the commit and is never guessed (G12
+      discipline). If a scorecard genuinely does not name the catcher, no
+      fielding credit is awarded — accepted, operator ruling.
+      DEFECT THIS FIXES (found by the S-A builder, 07/08/2026): the scoring
+      engine credits a fielder only when the token parsed from the dismissal
+      string appears in the match lineup; lineups hold canonical player ids while
+      the seeded dismissal strings held registry keys, so NO fielding credit
+      landed through the database path. Every catch, stumping and run-out in the
+      deployed demo scored zero — roughly 12% of all points (O4 calibration),
+      silently. The engine is correct; the seam feeding it was untested.
+      AUDIT CONSEQUENCE, binding on the cold acceptance run: G1 was verified
+      against the ENGINE, not against the database path. The cold run must
+      exercise the full path — scorecard entry → storage → recompute → displayed
+      score — not the engine in isolation.
+
 ## OPEN — DEFAULTS APPLY AT EXPIRY
 - O1 Trades per round (A7, 09/07/2026 — resolved to a contingency table, keyed
     on club teams entered, decided when nominations close): 3 club teams →
@@ -183,6 +222,24 @@
     strike-rate bonuses. All per-event values integer; econ floor keeps match
     scores whole. Calibrated on 25/26 data: BAT 45.2% / BOWL 43.1% / FIELD
     11.7% (independently reproduced from source, A9 — see D23).
+    SECOND-INNINGS MULTIPLIER (added A10, operator ruling 07/08/2026): in a
+    match where a team bats and fields twice, everything a player earns in their
+    team's SECOND innings (batting, bowling and fielding alike) is totalled,
+    multiplied by second_innings_multiplier, rounded HALF UP to a whole number,
+    and added to their first-innings total. ONE multiplication and ONE rounding
+    per player per match — never per event — so match scores stay integers as O4
+    requires. Captain/vice-captain doubling (D10) applies to the resulting MATCH
+    total, after the halving. Config key: second_innings_multiplier, DEFAULT 1.0;
+    the 26/27 season value is 0.5. It is config, not a constant (D13): the frozen
+    FIXTURE config keeps 1.0, so gate G1 and all existing hand-computed reference
+    scorecards are untouched. Known interaction, accepted: 25/26 starting prices
+    (D23) were derived without the multiplier and are therefore slightly high for
+    anyone who played two-innings matches — already covered by the D4/A9 rider,
+    and washed out by the D1 EMA within a few rounds.
+    OPEN SUB-ITEM for the scoring slice: per-innings vs per-match bonus
+    semantics. With innings-keyed scorecard lines, any bonus O4 defines PER MATCH
+    (currently the economy bonus) would be computed once per innings unless
+    explicitly aggregated. This must be resolved BEFORE scoring values are locked.
     Still open until season lock. EXPIRY: season lock.
 - O5 SR/economy thresholds — SUPERSEDED by O4 draft (09/07/2026): SR bonuses
     dropped; economy handled as the continuous per-run bonus inside O4. The
@@ -197,8 +254,11 @@
 ## CARRIED-FORWARD BUILD ITEMS (not gates; scoped into named slices, A9)
 These are known defects/gaps recorded so they survive seat rotation. None is a
 DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
-- C1 Ladder column alignment: table headers left-aligned against right-aligned
-     numeric cells on the ladder/leaderboard. Cosmetic, flagship view. → polish slice.
+- C1 CLOSED (S0, 07/08/2026). Recorded as a cosmetic ladder/leaderboard
+     alignment issue; was in fact a CSS specificity defect — `.table thead th`
+     (0,1,2) outranking `.col-num` (0,1,0) — affecting FOUR tables including both
+     PlayerProfile tables. Fixed at `.table` level with one rule. Operator-verified
+     on the deployed site.
 - C2 BYE ROW HAS NEVER RENDERED. G9 (bye = round median) is VERIFIED at the
      engine level, but every demo/seed scenario has run an even fantasy-team
      count, so no bye row has ever been displayed. At an odd participant count
