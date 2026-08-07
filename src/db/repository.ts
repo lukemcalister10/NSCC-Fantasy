@@ -116,29 +116,42 @@ export async function loadRawSeason(
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
       WHERE r.season_id = $1`,
   );
+  // INNINGS (0006/D5): a two-day match yields more than one line per player, so
+  // these queries return one row PER INNINGS and the ordering is explicit —
+  // recompute must not inherit whatever order the planner happens to produce.
+  // scoreMatch accumulates across lines, so a player's match total is the sum of
+  // their innings lines.
   const battingRows = await selectForSeason(
     db,
     seasonId,
-    `SELECT b.scorecard_id, b.player_id, b.runs, b.balls_faced, b.fours, b.sixes
+    `SELECT b.scorecard_id, b.innings, b.player_id, b.runs, b.balls_faced, b.fours, b.sixes
        FROM batting_lines b JOIN scorecards s ON b.scorecard_id = s.id
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
-      WHERE r.season_id = $1`,
+      WHERE r.season_id = $1
+      ORDER BY b.scorecard_id, b.innings, b.player_id`,
   );
   const bowlingRows = await selectForSeason(
     db,
     seasonId,
-    `SELECT b.scorecard_id, b.player_id, b.overs, b.runs_conceded, b.wickets
+    `SELECT b.scorecard_id, b.innings, b.player_id, b.overs, b.runs_conceded, b.wickets
        FROM bowling_lines b JOIN scorecards s ON b.scorecard_id = s.id
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
-      WHERE r.season_id = $1`,
+      WHERE r.season_id = $1
+      ORDER BY b.scorecard_id, b.innings, b.player_id`,
   );
+  // `resolved_text` (renamed from `raw_text` in 0006) is the CANONICAL,
+  // engine-facing string: fielder positions hold player ids, resolved against the
+  // registry under D22 when the scorecard was entered. `source_text` — the string
+  // as the operator typed or transcribed it — is deliberately NOT loaded: it is
+  // audit material, and recompute must be a function of canonical raw truth only.
   const dismissalRows = await selectForSeason(
     db,
     seasonId,
-    `SELECT d.scorecard_id, d.seq, d.raw_text FROM dismissals d
+    `SELECT d.scorecard_id, d.innings, d.seq, d.resolved_text FROM dismissals d
        JOIN scorecards s ON d.scorecard_id = s.id
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
-      WHERE r.season_id = $1`,
+      WHERE r.season_id = $1
+      ORDER BY d.scorecard_id, d.innings, d.seq`,
   );
 
   const scorecards: RawScorecard[] = scorecardRows.map((s) => {
@@ -170,8 +183,8 @@ export async function loadRawSeason(
         })),
       dismissals: dismissalRows
         .filter((r) => str(r.scorecard_id) === id)
-        .sort((a, b) => num(a.seq) - num(b.seq))
-        .map((r) => str(r.raw_text)),
+        .sort((a, b) => num(a.innings) - num(b.innings) || num(a.seq) - num(b.seq))
+        .map((r) => str(r.resolved_text)),
     };
   });
   void scardIds;

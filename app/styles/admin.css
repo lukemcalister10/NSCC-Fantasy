@@ -1,0 +1,196 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * MANAGER BACKEND (/admin/*) — S-A slice.
+ *
+ * Same tokens and the same restraint as the league views: no broadcast navy
+ * (that treatment is reserved for the ladder hero and score readouts), NSCC blue
+ * as the only accent. Admin screens are dense forms, so this file adds grids,
+ * inline inputs and the state banners; it introduces no new colour.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.admin-section {
+  margin-bottom: var(--sp-6);
+}
+.admin-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.admin-section-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+.admin-note {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-3);
+  line-height: 1.5;
+}
+
+/* Banners: state the operator must not miss (season lock, D24 freeze). */
+.admin-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-subtle);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  margin-bottom: var(--sp-4);
+}
+.admin-banner strong {
+  font-weight: 700;
+}
+.admin-banner-locked {
+  border-color: var(--role-ar-ink);
+  background: var(--role-ar-bg);
+  color: var(--role-ar-ink);
+}
+.admin-banner-frozen {
+  border-color: var(--down);
+  background: var(--down-tint);
+  color: var(--down);
+}
+.admin-banner-ok {
+  border-color: var(--up);
+  background: var(--up-tint);
+  color: var(--up);
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
+}
+@media (min-width: 640px) {
+  .admin-form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .admin-form-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .admin-form-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.field select,
+.field textarea {
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.btn-primary-inline {
+  width: auto;
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+}
+.btn-danger {
+  border-color: var(--down);
+  color: var(--down);
+  background: var(--surface);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--down-tint);
+}
+
+/* Dense editable table (registry, scorecard lines). */
+.admin-table input,
+.admin-table select {
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  width: 100%;
+  min-width: 0;
+}
+.admin-table input:disabled,
+.admin-table select:disabled {
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.admin-table .num-cell {
+  width: 5.5rem;
+}
+.admin-table td.tight {
+  padding: var(--sp-2);
+}
+
+.admin-status {
+  font-size: var(--fs-sm);
+  margin-top: var(--sp-2);
+}
+.admin-status-error {
+  color: var(--down);
+}
+.admin-status-ok {
+  color: var(--up);
+}
+
+.admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.admin-chip-on {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.admin-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-sm);
+}
+.admin-log li {
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+.admin-log li:last-child {
+  border-bottom: none;
+}
+
+.admin-diff {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-4);
+}
