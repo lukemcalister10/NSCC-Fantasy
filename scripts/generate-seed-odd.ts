@@ -156,7 +156,10 @@ function emitRaw(raw: RawSeason): string {
   out.push(
     insert(
       "dismissals",
-      ["scorecard_id", "seq", "raw_text"],
+      // `resolved_text` per 0006 (the column formerly called `raw_text`), matching
+      // the demo generator. The dev seed has no separate operator source string,
+      // so `source_text` is left NULL rather than duplicating the canonical form.
+      ["scorecard_id", "seq", "resolved_text"],
       raw.scorecards.flatMap((sc) => sc.dismissals.map((d, i) => [sc.id, i, d])),
     ),
   );
