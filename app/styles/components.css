@@ -290,6 +290,14 @@
 .col-num {
   text-align: right;
 }
+/* C1: a numeric HEADER must share its column's alignment. `.table thead th`
+   (specificity 0,1,2) outranks `.col-num` (0,1,0), so every `<th class="col-num">`
+   was rendering left above right-aligned cells. Re-qualified here to match that
+   specificity. Applies to `.table`, not `.ladder-table`, on purpose: the overall
+   leaderboard carries no `.ladder-table` class and C1 names it explicitly. */
+.table thead th.col-num {
+  text-align: right;
+}
 .col-rank {
   width: 2.2rem;
   color: var(--ink-faint);
