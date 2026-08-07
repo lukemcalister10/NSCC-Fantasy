@@ -208,9 +208,13 @@ async function seedSeasonInner(db: DbClient, raw: RawSeason): Promise<void> {
         [s.id, b.playerId, b.overs, b.runsConceded, b.wickets],
       );
     }
+    // `resolved_text` (0006): the canonical, engine-facing form with player ids in
+    // the fielder positions. RawScorecard.dismissals carries exactly that; the
+    // operator's source string (source_text) is entry-time audit material and has
+    // no place in a recompute fixture.
     for (let i = 0; i < s.dismissals.length; i++) {
       await db.query(
-        "INSERT INTO dismissals (scorecard_id, seq, raw_text) VALUES ($1,$2,$3)",
+        "INSERT INTO dismissals (scorecard_id, seq, resolved_text) VALUES ($1,$2,$3)",
         [s.id, i, s.dismissals[i]],
       );
     }

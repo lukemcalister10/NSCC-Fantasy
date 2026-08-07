@@ -152,11 +152,20 @@ function buildRaw(): RawSeason {
           { playerId: pid(7), overs: 6, runsConceded: 14, wickets: 3 }, // econ 2.33 → econ bonus
           { playerId: pid(8), overs: 5, runsConceded: 33, wickets: 1 },
         ],
+        // CANONICAL (engine-facing) dismissal strings — fielder positions hold
+        // player IDS, not registry keys. scoreMatch credits a fielder only when
+        // the parsed token is a member of the lineup, and the lineup is a set of
+        // player ids; the previous registry-key form ('c p10 b p08') therefore
+        // matched nothing and every fielding figure in seed_derived.sql came out
+        // 0 — the demo season was silently missing its whole fielding component.
+        // This is the same canonical form the admin scorecard entry writes into
+        // dismissals.resolved_text (0006), with the operator's typed string kept
+        // separately in source_text.
         dismissals: [
-          "c p10 b p08", // p10 outfield catch
-          "c p05 b p07", // p05 keeper catch
-          "st p05 b p07", // p05 stumping
-          "run out (p10)", // p10 unassisted run out
+          `c ${pid(10)} b ${pid(8)}`, // p10 outfield catch
+          `c ${pid(5)} b ${pid(7)}`, // p05 keeper catch (p05 keeps)
+          `st ${pid(5)} b ${pid(7)}`, // p05 stumping
+          `run out (${pid(10)})`, // p10 unassisted run out
         ],
       },
     ],
@@ -312,7 +321,10 @@ function emitRaw(raw: RawSeason): string {
   out.push(
     insert(
       "dismissals",
-      ["scorecard_id", "seq", "raw_text"],
+      // `resolved_text` per 0006 (the column formerly, and misleadingly, called
+      // `raw_text`). The demo seed has no separate operator source string, so
+      // `source_text` is left NULL rather than duplicating the canonical form.
+      ["scorecard_id", "seq", "resolved_text"],
       sc.dismissals.map((d, i) => [sc.id, i, d]),
     ),
   );

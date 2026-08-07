@@ -1,4 +1,17 @@
-# NSCC Fantasy Cricket — read-only league views (frontend slice 1)
+# NSCC Fantasy Cricket
+
+> **Latest slice: MANAGER CORE (S-A), 07/08/2026** — player registry (+ CSV seed import),
+> round management, multi-innings scorecard entry, the recompute control, D22 name
+> normalisation and the D24 scorecard freeze. Apply/verify runbook: **`MANAGER_VERIFY.md`**
+> (migrations `0005`–`0007`, the `/api/recompute` configuration, and the smoke test).
+> State-stamp: builds against KICKOFF v1.3 / DoD v1.2 (frozen) / DECISION_LOG **v1.9**,
+> continues from `main @ e698c77`. `src/engines/*` and `src/recompute/*` untouched
+> (`git diff -- src/engines src/recompute` prints nothing).
+>
+> The section below is the preceding slice's report (read-only league views), kept as the
+> record of how the frontend got here.
+
+## Read-only league views (frontend slice 1)
 
 Club fantasy cricket platform. Prior slices landed the **engine core** (scoring, pricing, cap
 ledger, starting price), the **Supabase schema + persistence + recompute**, the **full derived
