@@ -1,4 +1,6 @@
 import { describe, expect, it, beforeAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { generateRound } from "../src/recompute/roundRobin.js";
 import { makeTestDb, seedSeason } from "./helpers/pgliteDb.js";
 import {
@@ -6,6 +8,8 @@ import {
   priceEnteringRound,
   pid,
   tid,
+  OWNERS,
+  SEASON as SEASON_ID,
   R1,
   R2,
   TRADE_IN,
@@ -204,6 +208,98 @@ describe("C2 — the scenario applies cleanly through the live trigger stack", (
     );
     expect(Number(teams.rows[0]!.n)).toBe(scenario.raw.fantasyTeams.length);
     expect(Number(teams.rows[0]!.n) % 2).toBe(1);
+  }, 60_000);
+});
+
+describe("the EMITTED seed files apply against the real schema", () => {
+  /**
+   * WHY THIS EXISTS (Rule 9e — integration is not inherited). Every other test in
+   * this file exercises the scenario through `seedSeason`, the shared helper. The
+   * files the OPERATOR actually pastes are a different artifact, and they went
+   * stale the moment migration 0006 renamed `dismissals.raw_text` to
+   * `resolved_text`: the helper was updated, the emitter was not, and the tests
+   * stayed green while the artifact was broken. This applies the emitted SQL
+   * itself, so the paste path is covered rather than assumed.
+   */
+  const SEED_DIR = fileURLToPath(new URL("../supabase/seed/dev/", import.meta.url));
+
+  /** Machine-generated SQL: strip comment lines, split on statement boundaries. */
+  function statements(sql: string): string[] {
+    return sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n")
+      .split(/;\s*\n/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+
+  it("seed_odd_raw.sql then seed_odd_derived.sql apply cleanly and land the bye", async () => {
+    const db = await makeTestDb();
+
+    // Owner tokens the operator find-replaces with real auth.users ids.
+    const owners = OWNERS.map(
+      (_, i) => `00000000-0000-0000-0000-0000000c2c${i.toString().padStart(2, "0")}`,
+    );
+    for (const id of owners) {
+      await db.query(
+        "INSERT INTO profiles (id, display_name, is_league_manager) VALUES ($1,$2,false)",
+        [id, "owner"],
+      );
+    }
+
+    const substitute = (sql: string) =>
+      OWNERS.reduce((acc, token, i) => acc.split(token).join(owners[i]!), sql);
+
+    for (const file of ["seed_odd_raw.sql", "seed_odd_derived.sql"]) {
+      const sql = substitute(readFileSync(new URL(file, `file://${SEED_DIR}`), "utf8"));
+      for (const statement of statements(sql)) {
+        await db.query(statement);
+      }
+    }
+
+    // The bye is on the board, from the pasted files alone.
+    const byes = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM h2h_results WHERE away_team_id IS NULL AND bye_median IS NOT NULL",
+    );
+    expect(Number(byes.rows[0]!.n)).toBe(2);
+
+    const teams = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM fantasy_teams WHERE season_id = $1",
+      [SEASON_ID],
+    );
+    expect(Number(teams.rows[0]!.n) % 2).toBe(1);
+
+    // And the fielding credit survived the dismissal path (D25) end to end.
+    const fielding = await db.query<{ total: string | null }>(
+      "SELECT sum(fielding) AS total FROM player_match_scores",
+    );
+    expect(Number(fielding.rows[0]!.total)).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("re-applying the raw seed is idempotent", async () => {
+    const db = await makeTestDb();
+    const owners = OWNERS.map(
+      (_, i) => `00000000-0000-0000-0000-0000000c2d${i.toString().padStart(2, "0")}`,
+    );
+    for (const id of owners) {
+      await db.query(
+        "INSERT INTO profiles (id, display_name, is_league_manager) VALUES ($1,$2,false)",
+        [id, "owner"],
+      );
+    }
+    const sql = OWNERS.reduce(
+      (acc, token, i) => acc.split(token).join(owners[i]!),
+      readFileSync(new URL("seed_odd_raw.sql", `file://${SEED_DIR}`), "utf8"),
+    );
+    for (let pass = 0; pass < 2; pass++) {
+      for (const statement of statements(sql)) await db.query(statement);
+    }
+    const teams = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM fantasy_teams WHERE season_id = $1",
+      [SEASON_ID],
+    );
+    expect(Number(teams.rows[0]!.n)).toBe(5);
   }, 60_000);
 });
 
