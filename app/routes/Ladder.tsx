@@ -1,6 +1,7 @@
 import { useSeason, useLadder, useLeaderboard } from "../lib/queries";
 import { BroadcastPanel } from "../components/BroadcastPanel";
 import { Loading, ErrorState, EmptyState } from "../components/states";
+import "../styles/team.css";
 
 /**
  * Ladder + overall leaderboard. The ladder HEADER uses the reserved broadcast
@@ -68,6 +69,18 @@ export function Ladder() {
               ))}
             </tbody>
           </table>
+          {/*
+            C2 legend. At an odd team count one team byes every round, and a bye
+            is a GAME: it is scored against that round's median team score and
+            takes a win, loss or tie from it (D18). So P counts byes, PF includes
+            the byed round's own total, and Pts is 2·wins + ties (D20) across
+            both kinds of fixture — which is what makes the byed row reconcile
+            against the fixtures page.
+          */}
+          <p className="table-foot-note">
+            P counts byes: a byed team is scored against that round&rsquo;s median team
+            score (D18) and takes a win, loss or tie from it. Pts = 2 × wins + ties.
+          </p>
         </div>
       ) : (
         <EmptyState>
