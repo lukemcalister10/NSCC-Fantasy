@@ -1,4 +1,4 @@
-# DECISION LOG v2.0, 10/08/2026 (supersedes v1.9; delta = A11: selection materialisation D26; innings numbering semantics D27; second-innings multiplier deferred to a named engine slice D28; C2/C3/C4 closed; C5-C11 opened from the S-A/S-C reports and the live MANAGER_VERIFY run)
+# DECISION LOG v2.1, 10/08/2026 (supersedes v2.0; delta = A12: D26 mechanism ruled to Design A; C10 reclassified as a DETERMINISM defect and D29 opened; C5 corrected; player removal D30; ENGINE-SLICE PRECONDITION recorded; C6/C8/C9/C11/C13 closed)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -201,6 +201,60 @@
       materialised rows on every load, tripping the unique constraint on
       (fantasy_team_id, round_id, player_id) and surfacing a server-refusal
       banner on /team. The refusal is correct; the attempt is not.
+      MECHANISM RULED (A12, 10/08/2026) — DESIGN A, EAGER AND TRIGGER-DRIVEN,
+      in preference to a scheduled job at lock. A SECURITY DEFINER function
+      app.materialise_selections(p_team uuid, p_round uuid) rewrites the
+      (team, round) selection set from the trades ledger and carries captaincy
+      forward (this round's flags if present, else the most recent earlier
+      round's, else the dearest holding — mirroring resolveCaptaincy). Three
+      trigger points: AFTER INSERT ON trades (re-materialise every OPEN round for
+      that team); AFTER INSERT ON rounds; AFTER UPDATE OF lock_at ON rounds when
+      it moves into the future. WHY A BEATS THE LETTER OF D26(b): trades are
+      already refused after lock (0002), so the set freezes at lock
+      automatically — no scheduler is needed, and D26(d) still falls out because
+      only open rounds are materialised. The decisive argument is participant-
+      facing: G15's composition check then fires IN FRONT OF the participant at
+      trade time, rather than silently at lock with nobody watching.
+      OPERATOR CLARIFICATION (10/08/2026): "set and forget" describes the
+      DEFAULT, not the expectation. Trades can and should change a team every
+      week — that is the game. What D26 removes is the separate weekly
+      confirmation step, so a participant is never punished for skipping an
+      administrative action, only for the trades they do or do not make.
+      OWNERSHIP GAP, RECORDED: S-E specified this precisely; S-D finished before
+      that spec existed. The implementation is therefore UNOWNED as of
+      10/08/2026 and must be explicitly assigned — it is exactly the kind of item
+      that falls through the gap between parallel sessions (Standing Rule 9e).
+- D29 FIXTURE INDEX IS A PROPERTY OF THE ROUND (A12, 10/08/2026). The H2H round
+      index is seq − 1 — the round's own number — and NEVER its position among
+      active rounds. Binding on the engine slice.
+      WHY THIS IS A DETERMINISM DEFECT, NOT A DISPLAY MISMATCH (C10 reclassified):
+      src/recompute/h2h.ts indexes fixtures by position among ACTIVE rounds while
+      app/lib/queries.ts uses seq − 1. Under the engine's rule, an empty round
+      later acquiring its first match does not merely disagree with the UI — it
+      shifts every later round's index by one and RETROACTIVELY REWRITES WHO
+      PLAYED WHOM IN ROUNDS ALREADY SETTLED. That is the ladder changing with
+      hindsight, which the operator has explicitly ruled out (D24, same
+      principle, different door). D19 makes it reachable: a round with no entered
+      matches does not exist for H2H.
+      CONSEQUENCE OF THE FIX, wanted: a round's fixture becomes knowable before
+      it is played, publishable in advance, and immune to what happens in other
+      rounds — which is what D21's determinism means.
+      IMPLEMENTATION (specified by S-E, not built): pass {id, seq} pairs into
+      computeH2hResults and use seq − 1; orchestrator.ts is the only call site;
+      G9's single-round case (seq 1 → index 0) is unchanged, so G9 stays green
+      BYTE-IDENTICALLY. S-C's disagreement banner stays as the safety net until
+      the fix lands.
+- D30 PLAYER REMOVAL FROM THE POOL (A12, 10/08/2026). Operator ruling: inactive
+      players are REMOVED from the pool before season lock, so O3's "mean across
+      ALL players" needs no active/inactive qualification — the pool at lock
+      contains only real registrants. Implemented in S-D as a DELETE permitted
+      ONLY for a player with no raw history, including a check on
+      dismissals.resolved_text, which carries player ids as TEXT with no foreign
+      key — a plain delete would silently orphan a fielding credit, the exact
+      shape of the D25 defect. Refused post-lock, logged. NO "withdrawn" status
+      was added, deliberately: lock precedes round 1, so no player has history at
+      lock and the delete path covers every real case; a status would have
+      changed the cap arithmetic the operator declined to change.
 - D27 INNINGS NUMBERING SEMANTICS (binding on the engine slice). The `innings`
       integer added to batting_lines / bowling_lines / dismissals in migration
       0006 is the CLUB's own innings sequence (1, 2, …) — batting, bowling and
@@ -327,45 +381,91 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
 
 ### Opened 10/08/2026 (A11) — from the S-A/S-C reports and the live
 ### MANAGER_VERIFY run. C5 is the largest and is its own slice.
-- C5 SEASON LOCK IS UNBUILT. /admin/settings is still S0's stub and deliberately
-     unlinked; the /admin dashboard offers registry, rounds, scorecards and
-     recompute, and NO lock control. Nothing can go live without it: season lock
-     freezes settings, scoring rules, starting prices, roles/wk_eligible, α,
-     floor, $/pt, trades-per-round and fantasy-team registration (D21), and
-     COMPUTES the salary cap (O3). It is a one-way door. G10 is currently
-     verified against the enforcement layer, not against an operator-facing
-     action — so MANAGER_VERIFY step 9 (post-lock refusal) is BLOCKED, not
-     failed. → its own slice, before round 1.
-- C6 SPA ROUTING 404. Any typed URL or page refresh returns Vercel's 404 rather
+- C5 CORRECTED then CLOSED (S-D, 10/08/2026). AS WRITTEN, C5 WAS WRONG and the
+     correction matters: the ENFORCEMENT half of season lock has existed and been
+     green since 0002_locks.sql — the config/player/registration freezes, the O3
+     cap computation, the unpriced block and the one-way door are all triggers,
+     all verified. What was missing was only the OPERATOR'S ACCESS. Correct
+     wording: "season lock has no operator-facing action; enforcement is built
+     and verified." S-D built the settings page, the rehearsal preview, the
+     pool-completeness warning, type-the-season-name arming, and D30's removal
+     path, in migration 0008. The preview and the lock now CALL THE SAME
+     FUNCTIONS (app.season_pool_stats, app.season_lock_blocker), so
+     preview-cap ≡ lock-cap is structural rather than a matter of builder
+     discipline. Incidental G11 win: 0002 held the $100 rounding step as a
+     literal; it now reads pricing.roundingIncrement, with no verified number
+     moving (g10.cap-at-lock still computes $115,700).
+     G10 REMAINS UNCLAIMED as operator-action-verified — correctly. It moves when
+     the operator runs MANAGER_VERIFY step S9 on the live project and signs off.
+- C6 CLOSED (S-E, 10/08/2026). vercel.json rewrites unmatched paths to
+     index.html, excluding /api/. Verified in headless Chromium over nine typed
+     URLs, AND with a control run that removes the rewrite and reproduces the 404
+     on eight of nine — the check demonstrates the defect and then its absence,
+     rather than only asserting the happy path. Operator-verified live.
+     Original entry follows.
+- C6 (original) SPA ROUTING 404. Any typed URL or page refresh returns Vercel's 404 rather
      than the app: Vercel looks for a file at the path and answers before the
      client router runs. Affects EVERY route, not just /admin, and has been true
      since the first deploy — unnoticed because every smoke test navigated by
      clicking. Participants bookmark, refresh and share links, so this bites in
      week one. Fix is a vercel.json rewrite of unmatched paths to index.html.
-- C7 (subsumed by D26) Client-side selection materialisation re-inserts existing
-     rows and surfaces a duplicate-key refusal banner on /team.
-- C8 POSTGRES SSL CONFIGURATION. MANAGER_VERIFY specifies ?sslmode=require;
+- C7 MITIGATED (S-E, 10/08/2026); closes fully when D26's trigger lands. The
+     precise cause was NOT inherent re-insertion: the effect fired when holdings
+     arrived while the selections query was still in flight, so an already
+     materialised round looked empty and the insert went in. Now gated on the
+     selections query resolving, with duplicate-key treated as benign in
+     carry-forward only. The client writer STAYS until the D26 trigger exists —
+     removing it first would leave nobody writing selections, scoring every
+     participant zero in any round locking in that window. Removal is then one
+     effect deleted.
+- C8 CLOSED (S-E, 10/08/2026). Two compounding causes, read out of the installed
+     driver rather than inferred: pg maps ?sslmode=require to verify-full, and
+     ConnectionParameters merges the URL's parsed values ON TOP OF an explicit
+     ssl object, so a caller could not override it. resolveSslPolicy now strips
+     sslmode and states the policy explicitly (CA supplied → verify; no-verify →
+     encrypted but unauthenticated, and says so; silence → Node's store).
+     MANAGER_VERIFY corrected to name the connection variant — transaction pooler
+     for the serverless function, since the direct host is IPv6-only and Vercel
+     cannot reach it. Original entry follows.
+- C8 (original) POSTGRES SSL CONFIGURATION. MANAGER_VERIFY specifies ?sslmode=require;
      against the Supabase pooler this fails with "self-signed certificate in
      certificate chain". ?sslmode=no-verify works and is the operator's current
      live setting. Traffic stays encrypted either way; only chain verification
      is skipped. Proper fix is SSL options configured in src/db/pgClient.ts
      (Supabase CA) rather than a URL parameter, plus MANAGER_VERIFY corrected to
      name the connection variant AND the working SSL setting.
-- C9 RECOMPUTE LATENCY / TIMEOUT HANDLING. The first live recompute ran close to
+- C9 CLOSED (S-E, 10/08/2026). Cause was writeDerived issuing one INSERT
+     round-trip per derived row — free in-process against pglite, which is
+     exactly why the test suite never felt it, and thousands of network
+     round-trips from a serverless function. Now chunked multi-row inserts: same
+     rows, same order, same transaction. The statement-counting test was verified
+     to fail when batching was defeated (count assertion red, correctness
+     assertions still green — the right shape). Control now reports elapsed
+     seconds, an explicit timeout, Retry, and typed failure kinds.
+     LIVE RESULT: 7 seconds on the scratch season, against a prior run that
+     approached the 60s ceiling. Two consecutive runs then reported no change
+     (G3 idempotence on live infrastructure). The first post-migration run
+     corrected one stale price movement — expected, benign, and consistent with
+     0008 moving the rounding step from a literal to config.
+     Original entry follows.
+- C9 (original) RECOMPUTE LATENCY / TIMEOUT HANDLING. The first live recompute ran close to
      the serverless function timeout and the button appeared frozen with no
      progress or failure state. It eventually succeeded and reported G3
      idempotence correctly. Will worsen with a full season of data. Needs
      connection setup reviewed and the control to degrade honestly (progress,
      timeout, retry) rather than hang.
-- C10 SCHEDULE-INDEX CONTRACT (reported by S-C, not patched — correctly). The UI
-     derives fixtures with generateRound(teamIds, seq − 1); the engine settles
-     them by the round's index among ACTIVE rounds. These coincide only while
-     active rounds are contiguous from seq 1. D19 makes divergence reachable: a
-     round with no entered matches does not exist for H2H. The fixtures page
-     currently detects the disagreement and withholds the result rather than
-     attaching it to the wrong pairing. This is a contract question between
-     engine and display, NOT a display bug — resolve before round 1.
-- C11 SEED EMITTER DRIFT — EVIDENCE FOR STANDING RULE 9e. Migration 0006 renamed
+- C10 RECLASSIFIED AND PROMOTED TO D29 (A12). Not a display mismatch — a
+     determinism defect that lets settled fixtures be rewritten retroactively.
+     See D29 for the ruling and the specified implementation.
+- C11 CLOSED (S-E audit, 10/08/2026). The audit found exactly two artifact
+     emitters, both seed generators, and one real gap: the DEMO seed pair — the
+     one VERCEL_DEPLOY.md instructs the operator to paste — was applied by no
+     test; only the dev odd-count pair was. It was correct only because commit
+     5e21590 had fixed it BY HAND, with nothing keeping it correct through the
+     next migration. Now covered by an apply-the-emitted-file test. Everything
+     else pasteable is hand-written prose run by a human — bounded, left alone.
+     Original entry retained below as the record of why the rule exists.
+- C11 (original) SEED EMITTER DRIFT — EVIDENCE FOR STANDING RULE 9e. Migration 0006 renamed
      dismissals.raw_text → resolved_text. S-A updated the shared seedSeason
      helper and its own emitter; S-C's dev emitter still wrote the old name.
      Every S-C test stayed green (they route through the helper) while the .sql
@@ -378,7 +478,13 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
 - C12 MIGRATION NUMBERING. Photos were cut from S-A, so 0007 is the SCORECARD
      FREEZE, not photos. Earlier planning documents said 0007 = photos. The
      photo slice takes the next free number.
-- C13 UNPRICED PLAYER / PRICE-DRIFT SANITY (operator check, not a defect). The
+- C13 PARTLY CLOSED (10/08/2026). The unpriced-player half is handled: the lock
+     is BLOCKED while any player lacks a price (enforced in 0002, surfaced by
+     S-D's settings page), and D30 lets the operator remove players who should
+     not be in the pool at all. The price-drift half remains an OPERATOR CHECK
+     before lock — see the original entry, and O7 (α) if the drift looks too
+     sharp. Original entry follows.
+- C13 (original) UNPRICED PLAYER / PRICE-DRIFT SANITY (operator check, not a defect). The
      live scratch season shows 65 players, 1 awaiting a price — worth finding.
      Separately, every player fell in the demo recompute. Two candidate causes:
      (i) demo seed prices and demo scorecard scores were never calibrated
@@ -387,6 +493,19 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
      players fall MOST weeks while a few spike. (ii) is expected behaviour and
      self-corrects via the EMA, but it will alarm participants in week one and
      is the reason to revisit α (O7) before lock if it looks too sharp.
+
+## ENGINE-SLICE PRECONDITION FOR SEASON LOCK (A12, 10/08/2026) — READ BEFORE LOCKING
+Season lock is a ONE-WAY DOOR and it freezes the scoring rules. The settings page
+S-D built exposes exactly the scoring keys ScoringConfig carries TODAY — which are
+NOT O4's chosen values: no 50/100 bonuses, no duck, no not-out, no maiden, no 5WI,
+no continuous economy bonus, and no second_innings_multiplier. LOCKING BEFORE THE
+ENGINE SLICE LANDS WOULD FREEZE AN ECONOMY THAT IS NOT THE ONE CALIBRATED ON REAL
+25/26 DATA, permanently.
+Therefore the ordering is BINDING: engine slice (O4 shape + D28 multiplier + D29
+fixture index) AND D26's materialisation trigger must both land BEFORE season lock
+is fired on the real season. Registration list, roles and prices follow; lock last.
+Self-enforcing reminder, by design: when ScoringConfig is reshaped,
+settings-ui.config-driven.test.ts FAILS until descriptors exist for the new keys.
 
 ## FOLLOW-UPS NAMED BY BUILDERS (not V-NEXT; wanted before or soon after ship)
 - F1 materialise_round_selections RPC. Named by S-C. Now largely superseded by
