@@ -1,4 +1,4 @@
-# DECISION LOG v2.1, 10/08/2026 (supersedes v2.0; delta = A12: D26 mechanism ruled to Design A; C10 reclassified as a DETERMINISM defect and D29 opened; C5 corrected; player removal D30; ENGINE-SLICE PRECONDITION recorded; C6/C8/C9/C11/C13 closed)
+# DECISION LOG v2.2, 10/08/2026 (supersedes v2.1; delta = A13: four mid-slice rulings absorbed — milestone bonuses EXCLUSIVE, economy bonus PER INNINGS, second_innings_adjustment stored as a component, trade-time composition tightening; D28/D29/D26 all BUILT; ENGINE-SLICE PRECONDITION SATISFIED)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -220,11 +220,47 @@
       week — that is the game. What D26 removes is the separate weekly
       confirmation step, so a participant is never punished for skipping an
       administrative action, only for the trades they do or do not make.
-      OWNERSHIP GAP, RECORDED: S-E specified this precisely; S-D finished before
-      that spec existed. The implementation is therefore UNOWNED as of
-      10/08/2026 and must be explicitly assigned — it is exactly the kind of item
-      that falls through the gap between parallel sessions (Standing Rule 9e).
-- D29 FIXTURE INDEX IS A PROPERTY OF THE ROUND (A12, 10/08/2026). The H2H round
+      OWNERSHIP GAP, CLOSED: S-E specified this; S-D finished before that spec
+      existed, leaving it unowned. It was explicitly assigned to S-F and BUILT
+      (10/08/2026) as migration 0010: app.materialise_selections SECURITY
+      DEFINER, the three ruled trigger points, plus a ONE-TIME BACKFILL over
+      every open round x registered team — without which existing holdings would
+      have sat unmaterialised until someone happened to trade, which is the same
+      "nobody wrote the rows" failure D26 exists to end.
+      THE TWO-WRITER FINDING (S-F, 10/08/2026) — worth reading as a pattern, not
+      an incident. S-E's spec reduced client-side removal to ONE effect in
+      Team.tsx. There was a SECOND writer inside Trades.tsx materialising every
+      open round after each trade pair. Following the spec exactly would have
+      removed one and left the other — precisely the two-writer divergence D26
+      forbids — and it would have LOOKED correct, because the spec was followed.
+      This is the second time this project has been bitten by a precise spec
+      written against an incomplete reading (the first: C11's seed emitter drift).
+      LESSON, carried: a spec that names a specific file or line is a hypothesis
+      about the codebase, not a fact. Verify the claim before acting on it.
+      Both writers are gone. C7's duplicate-key tolerance went with its cause.
+      The /team repair button now calls a public.materialise_selections RPC, so
+      EXACTLY ONE piece of code in the system writes a selection set. F1 closed.
+      G15 TIGHTENED, PARTICIPANT-VISIBLE, KEPT DELIBERATELY: because holdings ARE
+      the selection set, composition is now judged on every ledger write — a lone
+      buy leaving a one-player team is refused AT TRADE TIME rather than silently
+      at lock. That is A12's decisive argument, so S-F kept it and pinned it with
+      five new G15 cases rather than working around it. CONSEQUENCE, recorded: a
+      squad can no longer be built incrementally across separate requests. Six
+      gate files that wrote lone trades as a convenience now write complete builds
+      or pairs — which is what the UI issues anyway, so no UI path broke. Anyone
+      building new against this API must issue complete builds or sell+buy pairs.
+- D29 BUILT (S-F, 10/08/2026). computeH2hResults now takes {id, seq} pairs and
+      uses seq − 1; orchestrator.ts was the only call site; generateRound was
+      unchanged (its own doc already specified seq − 1 — the orchestrator was
+      passing something else than the function documented). G9 is byte-identical:
+      single round, seq 1 → index 0. CONTROL RUN: with the positional rule
+      restored, the new test fails on exactly the retroactive-rewrite assertions
+      while G9 stays green — which is precisely why the defect survived
+      undetected. S-C's disagreement banner on the fixtures page is now DEAD CODE;
+      S-F left it in place and reported it rather than editing a file it did not
+      own. → remove in the polish slice (F7).
+      Original ruling retained below.
+- D29 (original) FIXTURE INDEX IS A PROPERTY OF THE ROUND (A12, 10/08/2026). The H2H round
       index is seq − 1 — the round's own number — and NEVER its position among
       active rounds. Binding on the engine slice.
       WHY THIS IS A DETERMINISM DEFECT, NOT A DISPLAY MISMATCH (C10 reclassified):
@@ -262,7 +298,30 @@
       ICC-style absolute four-innings numbering. This is precisely the grouping
       "their team's second innings" requires for the O4 multiplier. A future
       reader must not reinterpret it.
-- D28 SECOND-INNINGS MULTIPLIER DEFERRED TO A NAMED ENGINE SLICE. The O4
+- D28 BUILT (S-F, 10/08/2026) — see the WORKED EXAMPLE below, which is pinned as
+      a test in BOTH the engine and the database path. Original deferral entry
+      retained for the record.
+      WORKED EXAMPLE (season O4 values, multiplier 0.5, player is captain):
+        innings 1 — batting 62 + 10 (fifty) + 7 + 3 = 82 · bowling 38 + 1 maiden
+          = 39 · fielding 10 · economy floor(0.25 x 26) = 6 → TOTAL 137
+        innings 2 — batting 16 + 2 + 5 (not out) = 23 · bowling 19 · fielding 15
+          · economy floor(0.25 x 11) = 2 → TOTAL 59
+        59 x 0.5 = 29.5 → 30 (HALF UP, ONE rounding) · adjustment −29
+        base = 137 + 30 = 167 · captain x2 → 334
+      Halving PER COMPONENT instead would give 31, not 30. That one point is the
+      difference the "one multiplication, one rounding" rule buys, and it is
+      asserted directly by a test.
+      STORED COMPONENT (operator ruling A13, 10/08/2026): the multiplier is
+      recorded in player_match_scores as second_innings_adjustment =
+      roundHalfUp(second x m) − second (here −29), migration 0009, DEFAULT 0.
+      RATIONALE: base = batting + bowling + fielding + bonuses is a promise the
+      stored row keeps, and the multiplier breaks it — a player page would show a
+      breakdown that does not sum to the total, and a stored row could not be
+      reconciled from itself. A multiplier invisible in stored state is
+      unverifiable by hand, which is what this project's audit posture exists to
+      prevent. Under the fixture config the column is 0 in every row, so G1/G3
+      stay byte-identical. /players/:id displays the adjustment in the breakdown.
+- D28 (original) SECOND-INNINGS MULTIPLIER DEFERRED TO A NAMED ENGINE SLICE. The O4
       multiplier could not be built in S-A: scoreMatch (src/engines/scoring.ts)
       accumulates all lines into one flat per-player figure and
       orchestrator.buildCard flattens all lines into one card, so per-innings
@@ -334,6 +393,31 @@
     strike-rate bonuses. All per-event values integer; econ floor keeps match
     scores whole. Calibrated on 25/26 data: BAT 45.2% / BOWL 43.1% / FIELD
     11.7% (independently reproduced from source, A9 — see D23).
+    MILESTONE BONUSES ARE EXCLUSIVE, NOT CUMULATIVE (operator ruling A13,
+    10/08/2026). A century scores the 100 bonus of 20 ONLY — the century bonus
+    REPLACES the fifty bonus; they do not stack. A player passing 50 and not
+    reaching 100 scores 10. O4 lists them as separate lines, which the S-F
+    builder correctly flagged as ambiguous; this ruling resolves it. Do not
+    re-read the list as cumulative.
+    ECONOMY BONUS IS PER INNINGS (operator ruling A13, 10/08/2026, SUPERSEDING
+    the per-match reading in the original O4 text above and in the D4/A9 rider).
+    Operator, verbatim in substance: "Each innings a separate instance, and then
+    those two values added to the match score like all are." So the bonus is
+    computed on THAT INNINGS' balls and runs, floored and zero-clamped per
+    innings, and — because it is earned IN an innings — a second-innings economy
+    bonus is MULTIPLIED with everything else in that innings. There is no
+    per-match exemption and no special case: a bowler's second-innings work is
+    worth the multiplier across the board, wickets, maidens and economy alike.
+    This DISSOLVES the concern S-F escalated (that a second-innings-only bowler
+    would keep a full economy bonus while their wickets were halved). It also
+    means every O4 component is per innings, which is simpler than the partition
+    originally proposed, and it matches how the code already computed it per
+    line — so test/sa.scorecard-innings-e2e.test.ts's pin of bonuses === 10
+    STANDS UNCHANGED. The retained O5 threshold fields follow the same rule.
+    NOTE FOR THE D4/A9 RIDER: the rider's description of the economy bonus as
+    per-match is now superseded for IN-SEASON scoring. The rider's substance is
+    unaffected — 25/26 starting prices were derived from season aggregates and
+    remain approximate for high-volume bowlers, washed out by the D1 EMA.
     SECOND-INNINGS MULTIPLIER (added A10, operator ruling 07/08/2026): in a
     match where a team bats and fields twice, everything a player earns in their
     team's SECOND innings (batting, bowling and fielding alike) is totalled,
@@ -494,7 +578,20 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
      self-corrects via the EMA, but it will alarm participants in week one and
      is the reason to revisit α (O7) before lock if it looks too sharp.
 
-## ENGINE-SLICE PRECONDITION FOR SEASON LOCK (A12, 10/08/2026) — READ BEFORE LOCKING
+## ENGINE-SLICE PRECONDITION — SATISFIED 10/08/2026 (S-F merged at main 773a077)
+The engine slice landed: O4's shape, D28's multiplier, D29's fixture index and
+D26's trigger are all BUILT and green. G1 is UNMOVED with stronger evidence than a
+re-run — git diff on src/fixtures/reference-scorecards.ts and test/scoring.test.ts
+is EMPTY, and both reference cards are single-innings, so with the new O4 keys at
+zero and the multiplier at 1.0 in the frozen fixture config, G1 was arithmetically
+incapable of moving. G9 byte-identical. G11 expectations byte-identical. Suite
+348 passed (263 at base). Seed regeneration verified MECHANICALLY: undoing the
+slice's column and config additions reproduces all four committed .sql files
+exactly, so no derived number moved.
+SEASON LOCK IS THEREFORE PERMITTED, once registration, roles and prices are final
+and MANAGER_VERIFY S0–S9 closes G10. The original precondition text follows.
+
+## (original) ENGINE-SLICE PRECONDITION FOR SEASON LOCK (A12, 10/08/2026)
 Season lock is a ONE-WAY DOOR and it freezes the scoring rules. The settings page
 S-D built exposes exactly the scoring keys ScoringConfig carries TODAY — which are
 NOT O4's chosen values: no 50/100 bonuses, no duck, no not-out, no maiden, no 5WI,
@@ -508,9 +605,13 @@ Self-enforcing reminder, by design: when ScoringConfig is reshaped,
 settings-ui.config-driven.test.ts FAILS until descriptors exist for the new keys.
 
 ## FOLLOW-UPS NAMED BY BUILDERS (not V-NEXT; wanted before or soon after ship)
-- F1 materialise_round_selections RPC. Named by S-C. Now largely superseded by
-     D26's server-side trigger, which is the same fix done properly. The RPC
-     also closes the last atomicity seam (ledger written, materialisation lost).
+- F1 CLOSED (S-F, 10/08/2026). public.materialise_selections RPC exists; the
+     /team repair button calls it; exactly one code path writes a selection set.
+- F6 (reserved, not used — the /players/:id breakdown was built in-slice by S-F
+     rather than deferred, since the page would otherwise visibly fail to sum
+     once the season locks at 0.5).
+- F7 Remove S-C's fixture disagreement banner. Dead code since D29 landed; S-F
+     correctly left it rather than editing a file it did not own. → polish slice.
 - F2 Scorecard save is not atomic (PostgREST gives a browser no transaction).
      Bounded by design — a match contributes nothing until finalised, and the
      form says so. If a half-saved card on a finalised match ever bites, the fix
