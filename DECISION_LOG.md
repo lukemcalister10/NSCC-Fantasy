@@ -1,4 +1,4 @@
-# DECISION LOG v1.9, 07/08/2026 (supersedes v1.8; delta = A10: scorecard freeze policy D24; dismissal fielder identification D25; second-innings multiplier added to O4; C1 closed)
+# DECISION LOG v2.0, 10/08/2026 (supersedes v1.9; delta = A11: selection materialisation D26; innings numbering semantics D27; second-innings multiplier deferred to a named engine slice D28; C2/C3/C4 closed; C5-C11 opened from the S-A/S-C reports and the live MANAGER_VERIFY run)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
 ### One batched decision sitting per session; no thread proceeds without naming
@@ -171,6 +171,64 @@
       exercise the full path — scorecard entry → storage → recompute → displayed
       score — not the engine in isolation.
 
+## LOCKED — OPERATOR RULINGS OF 10/08/2026 (A11)
+- D26 SELECTION MATERIALISATION IS SERVER-SIDE AND AUTOMATIC. Operator ruling:
+      "You shouldn't need to open the app. Your team can be set and forget and
+      the trades are a choice. If you have a valid team at round 0, it's
+      submitted; and carries over." Therefore:
+      a. Selections and holdings are ONE AND THE SAME (no bench, no emergency —
+         V-NEXT, intentionally). A participant's round selection set IS their
+         holdings at that round's lock. There is no per-round selection choice
+         and NO weekly confirm flow may be built.
+      b. At each round's LOCK time, the database materialises every fantasy
+         team's current holdings into that round's selection set, carrying
+         captain and vice-captain forward from the previous round unless the
+         participant changed them. Server-side (trigger or scheduled action);
+         it MUST NOT depend on a participant opening the app.
+      c. Lock is the correct moment, not round start: trades are legal until
+         lock, so holdings-at-lock is the team that plays. This also keeps the
+         selection set DERIVED rather than authored, consistent with D15.
+      d. A participant who registers after a round's lock has no selections for
+         that round and scores zero. Operator ruling: "registering after the
+         lock means you miss the round." Accepted.
+      e. The ONLY way to score zero is to hold nobody. Forgetting to act is not
+         a failure mode that exists in this game.
+      SUPERSEDES the client-side carry-forward built in S-C, which writes on
+      app visit and therefore cannot cover a participant who never opens the
+      app. That code is to be REMOVED when the trigger lands, not kept as a
+      fallback — two writers of the same rows is how they diverge.
+      DEFECT IT ALSO CLOSES (C7): the client-side attempt re-inserts already
+      materialised rows on every load, tripping the unique constraint on
+      (fantasy_team_id, round_id, player_id) and surfacing a server-refusal
+      banner on /team. The refusal is correct; the attempt is not.
+- D27 INNINGS NUMBERING SEMANTICS (binding on the engine slice). The `innings`
+      integer added to batting_lines / bowling_lines / dismissals in migration
+      0006 is the CLUB's own innings sequence (1, 2, …) — batting, bowling and
+      dismissals sharing an index are the same phase of the match. It is NOT the
+      ICC-style absolute four-innings numbering. This is precisely the grouping
+      "their team's second innings" requires for the O4 multiplier. A future
+      reader must not reinterpret it.
+- D28 SECOND-INNINGS MULTIPLIER DEFERRED TO A NAMED ENGINE SLICE. The O4
+      multiplier could not be built in S-A: scoreMatch (src/engines/scoring.ts)
+      accumulates all lines into one flat per-player figure and
+      orchestrator.buildCard flattens all lines into one card, so per-innings
+      totalling cannot live outside the verified engine fences. S-A correctly
+      stopped and reported rather than editing. Recorded so it cannot fall
+      through the gap between sessions. The engine slice must:
+      a. Produce the multiplier inside `base`, so captain doubling (D10) lands
+         after the multiplier as the ruling requires.
+      b. RE-RUN G1. The fixture config holds second_innings_multiplier = 1.0, so
+         both hand-scored reference scorecards must come out BYTE-IDENTICAL. If
+         G1 moves, the implementation is wrong — most likely by rounding per
+         event or multiplying before summing.
+      c. Close three type-contract gaps outside S-A's fences: RawScorecard
+         (src/recompute/types.ts) has nowhere to carry `innings` (its dismissals
+         are a bare string[]), and `not_out` / `maidens` exist in the database
+         but are dropped in transit by repository.ts. Storage is sufficient; the
+         type contract is not.
+      d. Resolve the per-innings vs per-match bonus question (O4 sub-item). The
+         S-A e2e test pins today's behaviour explicitly so the change is visible.
+
 ## OPEN — DEFAULTS APPLY AT EXPIRY
 - O1 Trades per round (A7, 09/07/2026 — resolved to a contingency table, keyed
     on club teams entered, decided when nominations close): 3 club teams →
@@ -259,21 +317,91 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
      (0,1,2) outranking `.col-num` (0,1,0) — affecting FOUR tables including both
      PlayerProfile tables. Fixed at `.table` level with one rule. Operator-verified
      on the deployed site.
-- C2 BYE ROW HAS NEVER RENDERED. G9 (bye = round median) is VERIFIED at the
-     engine level, but every demo/seed scenario has run an even fantasy-team
-     count, so no bye row has ever been displayed. At an odd participant count
-     — likely, given 10–30 expected — every round produces a bye team whose
-     ladder row must show P, PF and ladder points sensibly against a
-     median-scored non-fixture, and whose fixture list must render "BYE" rather
-     than an opponent. Display path is UNTESTED. → team/trade UI or polish slice,
-     with an odd-count seed scenario.
-- C3 Team value vs invested value labelling (D8/A2) has no surface yet — no view
-     currently displays either figure. First appears in the team/trade UI; the
-     figure shown must be labelled per D8 (team value = cap remaining + Σ current
-     prices; Σ current prices alone = invested value). → team/trade UI slice.
-- C4 Mid-season player addition (KICKOFF: manager adds, price defaults to floor,
-     logged) is specified but has no UI. Cap is unaffected (fixed at lock).
-     → manager-core slice.
+- C2 CLOSED (S-C, 07/08/2026). Bye now renders on an odd-count dev seed and
+     reconciles by hand against the ladder.
+- C3 CLOSED (S-C, 07/08/2026). /team shows three distinct figures under three
+     distinct labels; G2 reconciles on screen ($245,000 cap remaining + $755,000
+     invested = $1,000,000 team value).
+- C4 CLOSED (S-A, 07/08/2026). Mid-season add lands at the config floor, is
+     logged by trigger, and leaves the cap untouched.
+
+### Opened 10/08/2026 (A11) — from the S-A/S-C reports and the live
+### MANAGER_VERIFY run. C5 is the largest and is its own slice.
+- C5 SEASON LOCK IS UNBUILT. /admin/settings is still S0's stub and deliberately
+     unlinked; the /admin dashboard offers registry, rounds, scorecards and
+     recompute, and NO lock control. Nothing can go live without it: season lock
+     freezes settings, scoring rules, starting prices, roles/wk_eligible, α,
+     floor, $/pt, trades-per-round and fantasy-team registration (D21), and
+     COMPUTES the salary cap (O3). It is a one-way door. G10 is currently
+     verified against the enforcement layer, not against an operator-facing
+     action — so MANAGER_VERIFY step 9 (post-lock refusal) is BLOCKED, not
+     failed. → its own slice, before round 1.
+- C6 SPA ROUTING 404. Any typed URL or page refresh returns Vercel's 404 rather
+     than the app: Vercel looks for a file at the path and answers before the
+     client router runs. Affects EVERY route, not just /admin, and has been true
+     since the first deploy — unnoticed because every smoke test navigated by
+     clicking. Participants bookmark, refresh and share links, so this bites in
+     week one. Fix is a vercel.json rewrite of unmatched paths to index.html.
+- C7 (subsumed by D26) Client-side selection materialisation re-inserts existing
+     rows and surfaces a duplicate-key refusal banner on /team.
+- C8 POSTGRES SSL CONFIGURATION. MANAGER_VERIFY specifies ?sslmode=require;
+     against the Supabase pooler this fails with "self-signed certificate in
+     certificate chain". ?sslmode=no-verify works and is the operator's current
+     live setting. Traffic stays encrypted either way; only chain verification
+     is skipped. Proper fix is SSL options configured in src/db/pgClient.ts
+     (Supabase CA) rather than a URL parameter, plus MANAGER_VERIFY corrected to
+     name the connection variant AND the working SSL setting.
+- C9 RECOMPUTE LATENCY / TIMEOUT HANDLING. The first live recompute ran close to
+     the serverless function timeout and the button appeared frozen with no
+     progress or failure state. It eventually succeeded and reported G3
+     idempotence correctly. Will worsen with a full season of data. Needs
+     connection setup reviewed and the control to degrade honestly (progress,
+     timeout, retry) rather than hang.
+- C10 SCHEDULE-INDEX CONTRACT (reported by S-C, not patched — correctly). The UI
+     derives fixtures with generateRound(teamIds, seq − 1); the engine settles
+     them by the round's index among ACTIVE rounds. These coincide only while
+     active rounds are contiguous from seq 1. D19 makes divergence reachable: a
+     round with no entered matches does not exist for H2H. The fixtures page
+     currently detects the disagreement and withholds the result rather than
+     attaching it to the wrong pairing. This is a contract question between
+     engine and display, NOT a display bug — resolve before round 1.
+- C11 SEED EMITTER DRIFT — EVIDENCE FOR STANDING RULE 9e. Migration 0006 renamed
+     dismissals.raw_text → resolved_text. S-A updated the shared seedSeason
+     helper and its own emitter; S-C's dev emitter still wrote the old name.
+     Every S-C test stayed green (they route through the helper) while the .sql
+     file an operator would actually paste would have failed on its first
+     INSERT. Two green reports, one broken artifact — caught only by the rebase.
+     Fixed in S-C's rebase, with tests that apply the EMITTED FILES rather than
+     the scenario object, and the test verified to fail when the old name is
+     restored. CARRIED ACTION: audit whether anything else generates SQL or
+     other artifacts that no test applies end-to-end.
+- C12 MIGRATION NUMBERING. Photos were cut from S-A, so 0007 is the SCORECARD
+     FREEZE, not photos. Earlier planning documents said 0007 = photos. The
+     photo slice takes the next free number.
+- C13 UNPRICED PLAYER / PRICE-DRIFT SANITY (operator check, not a defect). The
+     live scratch season shows 65 players, 1 awaiting a price — worth finding.
+     Separately, every player fell in the demo recompute. Two candidate causes:
+     (i) demo seed prices and demo scorecard scores were never calibrated
+     against each other, or (ii) the structural skew — a player holds price only
+     by scoring price ÷ $/pt, and cricket scores are right-skewed, so MOST
+     players fall MOST weeks while a few spike. (ii) is expected behaviour and
+     self-corrects via the EMA, but it will alarm participants in week one and
+     is the reason to revisit α (O7) before lock if it looks too sharp.
+
+## FOLLOW-UPS NAMED BY BUILDERS (not V-NEXT; wanted before or soon after ship)
+- F1 materialise_round_selections RPC. Named by S-C. Now largely superseded by
+     D26's server-side trigger, which is the same fix done properly. The RPC
+     also closes the last atomicity seam (ledger written, materialisation lost).
+- F2 Scorecard save is not atomic (PostgREST gives a browser no transaction).
+     Bounded by design — a match contributes nothing until finalised, and the
+     form says so. If a half-saved card on a finalised match ever bites, the fix
+     is an RPC. Named by S-A.
+- F3 Ledger/selection reconciliation banner on /team is the current handling for
+     the S-C atomicity gap. LEDGER IS AUTHORITATIVE when the two disagree.
+- F4 Code-split /admin. The merged bundle trips Vite's 500 kB chunk warning
+     (532 kB, 151 kB gzipped). Advisory only; cheap polish win.
+- F5 Placeholder.tsx orphaning. Once every stub is replaced the file has no
+     importer, and no single slice can safely delete it. → polish slice.
 
 ## V-NEXT (post-ship wishes land here, not in the build)
 PlayHQ API import-then-review · live scores · trade banking variants · bench/
