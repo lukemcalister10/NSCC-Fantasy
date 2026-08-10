@@ -1,6 +1,19 @@
 # NSCC Fantasy Cricket
 
-> **Latest slice: MANAGER CORE (S-A), 07/08/2026** — player registry (+ CSV seed import),
+> **Latest slice: PRE-SEASON CORRECTNESS (S-E), 10/08/2026** — full report:
+> **`REPORT_S-E_PRESEASON_CORRECTNESS.md`**. Fixes C6 (typed URLs and refresh returned Vercel's
+> 404 on every route — `vercel.json`), C8 (Postgres TLS configured properly instead of via
+> `?sslmode=`), C9 (recompute's per-row writes batched; the control now reports progress, timeout
+> and failure instead of hanging) and C7 (the `/team` duplicate-key banner). D26 (server-side
+> selection materialisation) and C10 (the schedule-index contract) are **specified for S-D and the
+> engine slice** rather than built — both need files this slice may not touch. State-stamp: builds
+> against KICKOFF v1.3 / DoD v1.2 (frozen) / DECISION_LOG **v2.0**, continues from `main @ eca2109`.
+> **No migrations added**; `src/engines/*`, `src/recompute/*` and `supabase/migrations/*` untouched
+> (`git diff` prints nothing for all three).
+>
+> The sections below are the preceding slices' reports, kept as the record of how the app got here.
+
+> **MANAGER CORE (S-A), 07/08/2026** — player registry (+ CSV seed import),
 > round management, multi-innings scorecard entry, the recompute control, D22 name
 > normalisation and the D24 scorecard freeze. Apply/verify runbook: **`MANAGER_VERIFY.md`**
 > (migrations `0005`–`0007`, the `/api/recompute` configuration, and the smoke test).

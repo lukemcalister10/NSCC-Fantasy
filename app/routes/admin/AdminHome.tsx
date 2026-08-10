@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { AdminPage, Section, SeasonLockBanner, StatusLine } from "./adminChrome";
 import { useAdminSeason, useAdminPlayers, useAdminRounds } from "../../lib/adminQueries";
-import { requestRecompute, type RecomputeResult } from "../../lib/adminMutations";
+import {
+  RecomputeError,
+  requestRecompute,
+  type RecomputeResult,
+} from "../../lib/adminMutations";
 import { Loading, ErrorState, EmptyState } from "../../components/states";
 import { money } from "../../lib/format";
 import { adelaideLabel } from "../../lib/lockTime";
@@ -96,13 +100,48 @@ export function AdminHome() {
   );
 }
 
+/**
+ * Seconds since `startedAt`, ticking once a second. A long-running control with
+ * no moving part is indistinguishable from a dead one — which is exactly how the
+ * first live recompute presented (C9).
+ */
+function useElapsedSeconds(startedAt: number | null): number {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (startedAt === null) {
+      setElapsed(0);
+      return;
+    }
+    setElapsed(0);
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return elapsed;
+}
+
 function RecomputeControl({ seasonId }: { seasonId: string }) {
   const [result, setResult] = useState<RecomputeResult | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [tookSeconds, setTookSeconds] = useState<number | null>(null);
 
   const run = useMutation({
     mutationFn: () => requestRecompute(seasonId),
     onSuccess: setResult,
+    onSettled: () => {
+      setTookSeconds(startedAt === null ? null : Math.round((Date.now() - startedAt) / 1000));
+      setStartedAt(null);
+    },
   });
+
+  const elapsed = useElapsedSeconds(run.isPending ? startedAt : null);
+  const failure = run.error instanceof RecomputeError ? run.error : null;
+
+  const start = () => {
+    setResult(null);
+    setTookSeconds(null);
+    setStartedAt(Date.now());
+    run.mutate();
+  };
 
   return (
     <div className="card" style={{ padding: "var(--sp-4)" }}>
@@ -113,26 +152,52 @@ function RecomputeControl({ seasonId }: { seasonId: string }) {
         config, and running it again on unchanged data changes nothing (D15/G3). There is no
         single-round pass; the summary below is what tells you which round moved.
       </p>
+      <p className="admin-note">
+        A full season takes tens of seconds and the hosted function is capped at 60. If it is cut
+        off you will be told so, and nothing will be half-written: the derived rows are replaced
+        in ONE transaction, so an interrupted run leaves the previous state exactly as it was.
+      </p>
 
       <div className="admin-actions">
         <button
           className="btn-primary btn-primary-inline"
           disabled={run.isPending}
-          onClick={() => {
-            setResult(null);
-            run.mutate();
-          }}
+          onClick={start}
         >
-          {run.isPending ? "Recomputing…" : "Recompute season"}
+          {run.isPending ? `Recomputing… ${elapsed}s` : failure ? "Retry recompute" : "Recompute season"}
         </button>
       </div>
 
-      <StatusLine error={run.error} />
+      {run.isPending ? (
+        <p className="admin-status" role="status">
+          Working — {elapsed}s elapsed. The server keeps going even if you navigate away; this
+          page just stops watching.
+        </p>
+      ) : null}
+
+      {failure ? (
+        <div className="admin-banner admin-banner-locked" style={{ marginTop: "var(--sp-3)" }} role="alert">
+          <strong>Recompute did not finish.</strong>
+          <span>{failure.message}</span>
+          <span>{failure.guidance}</span>
+          {failure.serverMayStillBeRunning ? (
+            <span>
+              Reload before deciding anything: the run may have committed after this page stopped
+              waiting.
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <StatusLine error={run.error} />
+      )}
 
       {result ? (
         result.changed ? (
           <div className="admin-banner admin-banner-ok" style={{ marginTop: "var(--sp-3)" }}>
-            <strong>Recomputed — derived state changed.</strong>
+            <strong>
+              Recomputed — derived state changed
+              {tookSeconds === null ? "" : ` (${tookSeconds}s)`}.
+            </strong>
             <span>
               {result.changedFamilies.join(", ")} · {result.priceMovementsChanged} price movement
               {result.priceMovementsChanged === 1 ? "" : "s"} differ.
@@ -150,7 +215,9 @@ function RecomputeControl({ seasonId }: { seasonId: string }) {
           </div>
         ) : (
           <div className="admin-banner" style={{ marginTop: "var(--sp-3)" }}>
-            <strong>Recomputed — nothing changed.</strong>
+            <strong>
+              Recomputed — nothing changed{tookSeconds === null ? "" : ` (${tookSeconds}s)`}.
+            </strong>
             <span>
               The stored derived state already matched what the raw data implies. That is what
               idempotence looks like (G3).

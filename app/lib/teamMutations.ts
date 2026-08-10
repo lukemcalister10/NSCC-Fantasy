@@ -152,6 +152,24 @@ function throwOn(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * "These rows already exist" — Postgres 23505 against
+ * `selections UNIQUE (fantasy_team_id, round_id, player_id)` (0001:162).
+ *
+ * This is a BENIGN outcome for carry-forward specifically, and only there. The
+ * database is right to refuse a second copy of a selection set; what was wrong
+ * was asking. When it happens the correct response is to re-read and carry on —
+ * the round already holds exactly what the attempt was going to write — not to
+ * accuse the participant of a refusal they did not cause (C7).
+ *
+ * It stays a REFUSAL everywhere else: an explicit captaincy change or a repair
+ * that hits this has genuinely lost a race, and the participant needs to know.
+ */
+export function isAlreadyMaterialised(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /duplicate key value violates unique constraint/i.test(message);
+}
+
 // ---------------------------------------------------------------------------
 // Team registration (pre-lock only — D21/G10 freezes the team set at lock)
 // ---------------------------------------------------------------------------

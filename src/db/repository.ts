@@ -257,6 +257,58 @@ function selectForSeason(
 // ---------------------------------------------------------------------------
 // Write derived (transactional replace)
 // ---------------------------------------------------------------------------
+
+/**
+ * Bind parameters per INSERT statement. Postgres' hard limit is 65,535; this sits
+ * an order of magnitude below it so a wide table cannot creep up on the ceiling,
+ * while still collapsing a season's writes into a handful of statements.
+ */
+const MAX_BIND_PARAMS = 8_000;
+
+/**
+ * One multi-row INSERT per chunk instead of one INSERT per row (C9).
+ *
+ * WHY THIS IS THE LATENCY FIX. `writeDerived` used to issue a round-trip per
+ * derived row — every player-match score, every price point, every cap snapshot.
+ * In-process against pglite that is free, which is why the gate suite never felt
+ * it; from a serverless function to a Postgres pooler a region away it is one
+ * network round-trip each, and a full season is thousands of them. That is what
+ * ran the first live recompute up against the function timeout, and it grows with
+ * every round played.
+ *
+ * WHAT IT DOES NOT CHANGE: the rows, their values, their order, or the single
+ * surrounding transaction. This is the same write, batched — G3 idempotence is
+ * the proof (test/recompute.idempotence.test.ts), and test/se.recompute-batching
+ * .test.ts pins the round-trip count so a regression to per-row writes fails
+ * loudly rather than quietly costing the operator a minute a week.
+ */
+async function insertRows(
+  db: DbClient,
+  table: string,
+  columns: string[],
+  rows: (string | number | boolean | null)[][],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const perStatement = Math.max(1, Math.floor(MAX_BIND_PARAMS / columns.length));
+  for (let i = 0; i < rows.length; i += perStatement) {
+    const chunk = rows.slice(i, i + perStatement);
+    const params: (string | number | boolean | null)[] = [];
+    const tuples = chunk.map(
+      (row) =>
+        `(${row
+          .map((value) => {
+            params.push(value);
+            return `$${params.length}`;
+          })
+          .join(",")})`,
+    );
+    await db.query(
+      `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${tuples.join(",")}`,
+      params,
+    );
+  }
+}
+
 export async function writeDerived(
   db: DbClient,
   seasonId: string,
@@ -292,61 +344,60 @@ export async function writeDerived(
       seasonId,
     ]);
 
-    for (const s of derived.playerMatchScores) {
-      await db.query(
-        `INSERT INTO player_match_scores
-           (match_id, player_id, played, batting, bowling, fielding, bonuses, base)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.base],
-      );
-    }
-    for (const p of derived.priceHistory) {
-      await db.query(
-        "INSERT INTO price_history (player_id, match_id, seq, price) VALUES ($1,$2,$3,$4)",
-        [p.playerId, p.matchId, p.seq, p.price],
-      );
-    }
-    for (const c of derived.teamCapSnapshots) {
-      await db.query(
-        `INSERT INTO team_cap_snapshots
-           (fantasy_team_id, as_of_round_id, cap_remaining, invested_value, team_value)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [c.fantasyTeamId, c.asOfRoundId, c.capRemaining, c.investedValue, c.teamValue],
-      );
-    }
-    for (const tr of derived.teamRoundScores) {
-      await db.query(
-        `INSERT INTO team_round_scores
-           (fantasy_team_id, round_id, total, captain_player_id)
-         VALUES ($1,$2,$3,$4)`,
-        [tr.fantasyTeamId, tr.roundId, tr.total, tr.captainPlayerId],
-      );
-    }
-    for (const h of derived.h2hResults) {
-      // h2h_results.id is a physical surrogate (DEFAULT gen_random_uuid); it is
-      // deliberately not part of the derived contract and never read back.
-      await db.query(
-        `INSERT INTO h2h_results
-           (round_id, home_team_id, away_team_id, home_points, away_points, bye_median, outcome)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [h.roundId, h.homeTeamId, h.awayTeamId, h.homePoints, h.awayPoints, h.byeMedian, h.outcome],
-      );
-    }
-    for (const l of derived.ladder) {
-      await db.query(
-        `INSERT INTO ladder
-           (season_id, fantasy_team_id, played, wins, losses, ties, points_for, ladder_points)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [seasonId, l.fantasyTeamId, l.played, l.wins, l.losses, l.ties, l.pointsFor, l.ladderPoints],
-      );
-    }
-    for (const o of derived.overallLeaderboard) {
-      await db.query(
-        `INSERT INTO overall_leaderboard (season_id, fantasy_team_id, total_points)
-         VALUES ($1,$2,$3)`,
-        [seasonId, o.fantasyTeamId, o.totalPoints],
-      );
-    }
+    await insertRows(
+      db,
+      "player_match_scores",
+      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "base"],
+      derived.playerMatchScores.map((s) => [
+        s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.base,
+      ]),
+    );
+    await insertRows(
+      db,
+      "price_history",
+      ["player_id", "match_id", "seq", "price"],
+      derived.priceHistory.map((p) => [p.playerId, p.matchId, p.seq, p.price]),
+    );
+    await insertRows(
+      db,
+      "team_cap_snapshots",
+      ["fantasy_team_id", "as_of_round_id", "cap_remaining", "invested_value", "team_value"],
+      derived.teamCapSnapshots.map((c) => [
+        c.fantasyTeamId, c.asOfRoundId, c.capRemaining, c.investedValue, c.teamValue,
+      ]),
+    );
+    await insertRows(
+      db,
+      "team_round_scores",
+      ["fantasy_team_id", "round_id", "total", "captain_player_id"],
+      derived.teamRoundScores.map((tr) => [
+        tr.fantasyTeamId, tr.roundId, tr.total, tr.captainPlayerId,
+      ]),
+    );
+    // h2h_results.id is a physical surrogate (DEFAULT gen_random_uuid); it is
+    // deliberately not part of the derived contract and never read back.
+    await insertRows(
+      db,
+      "h2h_results",
+      ["round_id", "home_team_id", "away_team_id", "home_points", "away_points", "bye_median", "outcome"],
+      derived.h2hResults.map((h) => [
+        h.roundId, h.homeTeamId, h.awayTeamId, h.homePoints, h.awayPoints, h.byeMedian, h.outcome,
+      ]),
+    );
+    await insertRows(
+      db,
+      "ladder",
+      ["season_id", "fantasy_team_id", "played", "wins", "losses", "ties", "points_for", "ladder_points"],
+      derived.ladder.map((l) => [
+        seasonId, l.fantasyTeamId, l.played, l.wins, l.losses, l.ties, l.pointsFor, l.ladderPoints,
+      ]),
+    );
+    await insertRows(
+      db,
+      "overall_leaderboard",
+      ["season_id", "fantasy_team_id", "total_points"],
+      derived.overallLeaderboard.map((o) => [seasonId, o.fantasyTeamId, o.totalPoints]),
+    );
 
     await db.query("COMMIT");
   } catch (err) {

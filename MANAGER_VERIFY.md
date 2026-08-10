@@ -3,6 +3,13 @@
 State-stamp: as-of 07/08/2026 · slice **S-A manager core** · builds against KICKOFF v1.3 /
 DEFINITION_OF_DONE v1.2 (frozen) / DECISION_LOG **v1.9** · continues from `main @ e698c77`.
 
+> **Corrected 10/08/2026 by S-E (pre-season correctness), against DECISION_LOG v2.0.** Three
+> changes, all in the light of the live run this runbook produced: step 2 now names **which
+> connection string** to use and how **SSL** is actually configured (C8 — `?sslmode=require` was
+> wrong and produced a misleading "self-signed certificate" error), step 3 opens with a
+> **typed-URL / refresh check** (C6), and step 7 states what the recompute control does when it is
+> slow or cut off (C9). Steps 1 and 4–6, 8–10 are S-A's, unchanged.
+
 This runbook takes the operator from a live project running migrations `0001–0004` to a working
 manager backend: **player registry** (with the CSV seed import), **rounds**, **scorecard entry**,
 and the **recompute** control. Photos are NOT in this slice (deferred, with migration 0007's
@@ -56,13 +63,69 @@ In **Vercel → Project → Settings → Environment Variables**, add (Productio
 |---|---|
 | `SUPABASE_URL` | your project URL (the same one the frontend uses) |
 | `SUPABASE_ANON_KEY` | your publishable key (the same one the frontend uses) |
-| `POSTGRES_URL` | the project's Postgres connection string, with `?sslmode=require` |
+| `POSTGRES_URL` | the **Transaction pooler** connection string — see below. No `sslmode` needed |
+| `POSTGRES_CA_CERT` | the project's SSL certificate, pasted whole — see below. Optional but preferred |
 
-`POSTGRES_URL` is the only secret of the three. Note what is deliberately absent: no `VITE_`
+`POSTGRES_URL` is the only secret of the four. Note what is deliberately absent: no `VITE_`
 prefix, so Vite cannot inline it into a browser bundle even by mistake, and no value for it
 anywhere in this repository. `test/sa.server-secrets.test.ts` fails the build if any file under
 `app/` ever imports the pg driver, the pg adapter, the recompute runner, or names these
 variables.
+
+### Which connection string (this runbook did not say, and it matters — C8)
+
+Supabase → **Connect** offers three, and they are not interchangeable:
+
+| Variant | Looks like | Use it for |
+|---|---|---|
+| **Transaction pooler** | `postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres` | **the Vercel function** — IPv4, built for short-lived serverless connections |
+| **Session pooler** | same host, port **5432** | the CLI below, if your network is IPv4-only |
+| **Direct** | `postgresql://postgres:<pw>@db.<ref>.supabase.co:5432/postgres` | the CLI from an IPv6-capable machine |
+
+The direct host is **IPv6-only** on current projects, which a Vercel function generally cannot
+reach — pick the transaction pooler there and the failure never arises.
+
+### SSL: what `?sslmode=require` actually does here (C8)
+
+The earlier instruction to append `?sslmode=require` was wrong in a way worth spelling out,
+because the error it produces reads like a broken database:
+
+```
+Error: self-signed certificate in certificate chain
+```
+
+Nothing is self-signed and nothing is broken. `sslmode=require` is mapped by this driver to
+**verify-full**, and Node's trust store does not carry the pooler's CA — so the connection is
+refused for want of a certificate, not for want of encryption. Worse, the setting could not be
+overridden in code, because the URL's parsed values are merged **on top of** whatever the
+application passes.
+
+So TLS is now configured in `src/db/pgClient.ts`, and `sslmode` is **stripped from the URL**
+before the driver ever sees it. Choose one of:
+
+- **Preferred — verify the chain.** Supabase → **Settings → Database → SSL Configuration** →
+  *Download certificate*. Paste the whole PEM (including the `BEGIN`/`END` lines) into
+  `POSTGRES_CA_CERT`. The chain is then verified against the project's own CA.
+  (A file path works too, via `POSTGRES_CA_CERT_PATH`, which suits the CLI better than Vercel.)
+- **Working alternative — skip verification.** Leave `POSTGRES_CA_CERT` unset and append
+  `?sslmode=no-verify` to `POSTGRES_URL` (or set `POSTGRES_SSL_NO_VERIFY=1`). This is the
+  operator's current live setting and it is fine to keep: traffic is still encrypted; what is
+  given up is proof of **who** is on the other end.
+
+If a chain error ever appears again, the message now names both remedies rather than just the
+certificate.
+
+### Recompute takes tens of seconds — put the function near the database (C9)
+
+`vercel.json` caps `api/recompute.ts` at **60 seconds**. A full-season pass is well inside that,
+but distance is the dominant cost: the function opens one connection and writes the season's
+derived rows over it, so a function in Washington talking to a database in Sydney pays that
+round-trip on every statement. In **Vercel → Settings → Functions**, set the region to the one
+nearest your Supabase project (`syd1` for an `ap-southeast-2` project).
+
+If a run is cut off anyway, the control now says so explicitly and offers Retry, and **nothing is
+half-written**: the derived rows are replaced inside one transaction, so an interrupted run
+leaves the previous state exactly as it was. Retrying is always safe (D15/G3).
 
 Redeploy after setting them (Vite bakes env at build time; the function reads at runtime, but a
 redeploy is the simplest way to be sure both are current).
@@ -87,9 +150,19 @@ what would change on a live season before changing it.
 Sign in as a league-manager account (`profiles.is_league_manager = true`) and work through these
 in order. The **Expect** line is the pass condition.
 
+**0. Typed URLs and refresh work at all (C6).** Before anything else: **type** a URL into the
+address bar rather than clicking to it — `/players`, then `/team`, then `/admin/rounds` — and
+press **F5** on each. **Expect:** the app, every time. Until `vercel.json` landed, every one of
+these returned Vercel's own 404 page, because Vercel looked for a file at that path and answered
+before the client router ran. It went unnoticed for the whole project because every previous
+smoke test navigated by clicking, which never leaves the already-loaded bundle. Participants
+bookmark, refresh and share links, so this is the first thing to check on any new deployment.
+
 **1. Non-managers see nothing.** In a private window, sign in as an ordinary participant and
 visit `/admin`. **Expect:** "Manager access only". Signed out entirely, `/admin` bounces to
 `/login` (D17). Neither is the real boundary — RLS is — but both must hold.
+**Do both by TYPING the URL, not clicking** — the rewrite in step 0 means a typed `/admin` now
+reaches the app, so it must reach the app's guards too, not an unguarded page.
 
 **2. Registry renders.** Open **/admin/players**. **Expect:** every registered player with role,
 WK flag, starting price and active state; the season-lock banner states plainly whether prices
@@ -118,10 +191,16 @@ Add dismissals by typing them as they read ("c Sam Hollis b …"). **Expect:** e
 it credits as you type; a misspelt fielder reads "not in this lineup" and the **Save** button is
 disabled until it is fixed (D25). Save, then **Mark match finalised**.
 
-**7. Recompute.** Open **/admin**, press **Recompute season**. **Expect:** a summary naming which
-derived families changed, how many price movements differ, and which rounds moved. Press it again
-without changing anything. **Expect:** "Recomputed — nothing changed" (that is G3 idempotence,
-visible).
+**7. Recompute.** Open **/admin**, press **Recompute season**. **Expect:** a running
+**seconds-elapsed counter** while it works — never a button that simply sits there — then a
+summary naming which derived families changed, how many price movements differ, which rounds
+moved, and how long it took. Press it again without changing anything. **Expect:** "Recomputed —
+nothing changed" (that is G3 idempotence, visible).
+
+If it fails instead, **Expect** a named cause and a next action — cut off by the platform, not
+configured, refused by the database, or the engine's own message verbatim — plus a **Retry**
+button. A recompute that is cut off writes nothing: the derived rows are replaced in one
+transaction, so the previous state stands and retrying is always safe.
 
 **8. The scores are right.** Open the player pages for the players you entered.
 **Expect:** batting totals are the SUM of both innings, and the fielders you named carry catch /

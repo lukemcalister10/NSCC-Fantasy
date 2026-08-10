@@ -61,6 +61,14 @@ export interface TeamState {
   team: { id: string; name: string } | null;
   trades: TradeRow[];
   selections: SelectionRow[];
+  /**
+   * TRUE ONLY once the selections query has actually answered (C7). An empty
+   * `selections` array means two different things — "this team has none" and
+   * "we have not been told yet" — and carry-forward must not act on the second.
+   * A team with no id has nothing to load, and is reported as loaded so callers
+   * do not wait forever on a query that never runs.
+   */
+  selectionsLoaded: boolean;
   selectionsForActiveRound: SelectionRow[];
   /** The latest earlier round that carries selections — captaincy carries forward from it. */
   priorSelections: SelectionRow[];
@@ -184,6 +192,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     team: teamQ.data ? { id: teamQ.data.id, name: teamQ.data.name } : null,
     trades,
     selections,
+    selectionsLoaded: !teamId || selectionsQ.isSuccess,
     selectionsForActiveRound,
     priorSelections,
     pool,
