@@ -4,6 +4,7 @@ import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
 import {
   buildInitialSquad,
+  isAlreadyMaterialised,
   registerTeam,
   resolveCaptaincy,
   setCaptaincy,
@@ -41,12 +42,24 @@ import "../styles/team.css";
  * participant who does nothing all week fields their full squad. The only way to
  * score zero is to hold nobody.
  *
- * MATERIALISATION IS BEST-EFFORT FROM THE CLIENT, and this is a known limit
- * rather than a hidden one: with no migration available there is no trigger or
- * scheduled job to do it server-side, so carry-forward happens when a client is
- * present before the round locks. It writes into EVERY open round, not just the
- * next one, so one visit covers every round already on the board. See the slice
- * report's named follow-up (a `materialise_round_selections` RPC).
+ * MATERIALISATION HERE IS INTERIM, AND ITS REPLACEMENT IS ALREADY RULED ON.
+ * D26 (operator, 10/08/2026) settles that the database materialises holdings into
+ * each round's selection set at LOCK, server-side, and that this client-side
+ * carry-forward is to be REMOVED when that trigger lands — not kept as a
+ * fallback, because two writers of the same rows is how they diverge. S-E may add
+ * no migration (Standing Rule 9a), so the trigger is specified for S-D and this
+ * code stays until it exists: deleting the only writer first would leave every
+ * participant with no selections, and a zero score, for any round that locked in
+ * between. That trade is stated, not hidden.
+ *
+ * WHAT IT CANNOT DO, precisely: it runs only when a client is present before the
+ * round locks, so a participant who never opens the app is not covered — which is
+ * the whole reason D26 exists. It writes into EVERY open round, not just the next
+ * one, so one visit covers every round already on the board.
+ *
+ * REMOVAL IS ONE FILE: delete the effect below and the `syncSelectionsToHoldings`
+ * call inside it. Nothing else in this screen depends on it — the reconciliation
+ * banner and explicit captaincy changes are separate paths and stay.
  */
 export function Team() {
   const { session } = useAuth();
@@ -74,9 +87,20 @@ export function Team() {
   // Only ever fills an EMPTY set: nothing a participant authored is overwritten
   // without their say-so. A set that exists but disagrees with the ledger is a
   // reconciliation case, handled by the banner below (ledger authoritative).
+  //
+  // C7, FIXED HERE: this used to run as soon as HOLDINGS arrived. Hooks run
+  // before the component's loading early-return, and `trades` and `selections`
+  // are two independent queries — so on a cold load where trades answered first,
+  // `state.selections` was still the empty array it starts as, every open round
+  // looked unmaterialised, and the insert went in on top of rows that already
+  // existed. Postgres refused it (23505 on UNIQUE (team, round, player)), which
+  // was correct, and /team showed the participant a server-refusal banner for
+  // something they had not done. `selectionsLoaded` distinguishes "none" from
+  // "not told yet"; the duplicate-key catch below makes the residual race benign.
   const attempted = useRef(new Set<string>());
   useEffect(() => {
     if (!state.team || !captaincy || state.holdings.length === 0) return;
+    if (!state.selectionsLoaded) return;
     const teamId = state.team.id;
     const fingerprint = state.holdings.map((h) => h.playerId).sort().join(",");
     for (const round of state.openRounds) {
@@ -93,10 +117,26 @@ export function Team() {
         captaincy,
       })
         .then(() => state.refetch())
-        .catch((err: unknown) => setRefusal(translateRefusal(err)));
+        .catch((err: unknown) => {
+          // Already materialised (another tab, or this tab racing its own
+          // refetch): the round holds exactly what we were about to write, so
+          // re-read and say nothing. Every other refusal is still surfaced.
+          if (isAlreadyMaterialised(err)) {
+            state.refetch();
+            return;
+          }
+          setRefusal(translateRefusal(err));
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.team?.id, state.holdings, state.openRounds, state.selections, captaincy]);
+  }, [
+    state.team?.id,
+    state.holdings,
+    state.openRounds,
+    state.selections,
+    state.selectionsLoaded,
+    captaincy,
+  ]);
 
   if (season.isLoading || state.isLoading) return <Loading />;
   if (season.error) return <ErrorState error={season.error} />;

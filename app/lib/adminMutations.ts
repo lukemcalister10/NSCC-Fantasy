@@ -324,29 +324,147 @@ export interface RecomputeResult {
 }
 
 /**
+ * How a recompute failed, as a KIND rather than a string to be regex-matched by
+ * the screen (C9). The first live run died silently against the function timeout
+ * and the button simply sat there: a frozen control tells the operator nothing
+ * about whether to wait, press again, or go and read a runbook. Each kind below
+ * exists because it implies a DIFFERENT next action.
+ */
+export type RecomputeFailureKind =
+  | "session" // the browser's own session went stale — sign in again
+  | "refused" // the database says this account is not the league manager
+  | "not-configured" // the deployment has no server credentials at all
+  | "timeout" // no answer within the client's own budget
+  | "gateway-timeout" // the platform killed the function mid-run
+  | "network" // the request never completed
+  | "engine" // the recompute itself threw — the message is the finding
+  | "unknown";
+
+export class RecomputeError extends Error {
+  readonly kind: RecomputeFailureKind;
+  /** What the operator should do next. Never "try again later" alone. */
+  readonly guidance: string;
+  /** True when the server may still be mid-write — see `guidance`. */
+  readonly serverMayStillBeRunning: boolean;
+
+  constructor(
+    kind: RecomputeFailureKind,
+    message: string,
+    guidance: string,
+    serverMayStillBeRunning = false,
+  ) {
+    super(message);
+    this.name = "RecomputeError";
+    this.kind = kind;
+    this.guidance = guidance;
+    this.serverMayStillBeRunning = serverMayStillBeRunning;
+  }
+}
+
+/**
+ * Client-side budget. The hosted function is capped at 60s (vercel.json), so a
+ * platform 504 normally lands first and names the cause precisely; this is the
+ * backstop for the case where nothing comes back at all, and it exists so the
+ * button can never hang indefinitely.
+ */
+const RECOMPUTE_TIMEOUT_MS = 75_000;
+
+/**
  * Ask the server to run a FULL-SEASON recompute. There is no partial pass: prices
  * are a chain, so no round can be rebuilt alone without re-deriving everything
  * after it, and writing a round-scoped engine entry point would fork the verified
  * recompute path. What is round-scoped is the SUMMARY that comes back.
+ *
+ * SAFE TO RETRY, ALWAYS. Recompute is a pure function of raw scorecards plus
+ * frozen config (D15/G3) and `writeDerived` is one transaction, so a run that was
+ * cut off either committed or left the previous derived state untouched. There is
+ * no half-written outcome to repair, which is why the UI can offer Retry without
+ * qualification.
  */
-export async function requestRecompute(seasonId: string): Promise<RecomputeResult> {
+export async function requestRecompute(
+  seasonId: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<RecomputeResult> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) throw new Error("your session has expired — sign in again");
+  if (!token) {
+    throw new RecomputeError(
+      "session",
+      "your session has expired — sign in again",
+      "Sign out and back in, then press Recompute again. Nothing was sent to the server.",
+    );
+  }
 
-  const res = await fetch("/api/recompute", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ seasonId }),
-  });
+  const controller = new AbortController();
+  const budget = opts.timeoutMs ?? RECOMPUTE_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), budget);
+
+  let res: Response;
+  try {
+    res = await fetch("/api/recompute", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ seasonId }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new RecomputeError(
+        "timeout",
+        `no answer from the server within ${Math.round(budget / 1000)}s`,
+        "The run may still be finishing on the server. Wait a minute, reload this page, and check whether the derived data moved before pressing Retry — a second run is harmless either way (G3).",
+        true,
+      );
+    }
+    throw new RecomputeError(
+      "network",
+      err instanceof Error ? err.message : String(err),
+      "The request did not reach the server. Check the connection and press Retry.",
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 
   const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error: unknown }).error)
-        : `recompute failed (HTTP ${res.status})`;
-    throw new Error(message);
+  const serverMessage =
+    payload && typeof payload === "object" && "error" in payload
+      ? String((payload as { error: unknown }).error)
+      : null;
+
+  if (res.ok) return payload as RecomputeResult;
+
+  switch (res.status) {
+    case 401:
+      throw new RecomputeError(
+        "session",
+        serverMessage ?? "session is not valid",
+        "Sign out and back in, then press Retry.",
+      );
+    case 403:
+      throw new RecomputeError(
+        "refused",
+        serverMessage ?? "league manager only",
+        "The database refused this account (D16 — the manager role is enforced in Postgres, not here). Ask for the league-manager flag on your profile.",
+      );
+    case 503:
+      throw new RecomputeError(
+        "not-configured",
+        serverMessage ?? "recompute is not configured on this deployment",
+        "The deployment has no server credentials. Set them per MANAGER_VERIFY.md step 2 and redeploy — or run the recompute from the CLI, which uses the same runner.",
+      );
+    case 502:
+    case 504:
+      throw new RecomputeError(
+        "gateway-timeout",
+        serverMessage ?? `the recompute function was cut off (HTTP ${res.status})`,
+        "The hosted function ran out of time before finishing. Nothing was half-written — the write is one transaction, so the previous derived state stands. Press Retry; if it times out repeatedly, run it from the CLI (MANAGER_VERIFY.md), which has no time limit.",
+        true,
+      );
+    default:
+      throw new RecomputeError(
+        res.status === 500 ? "engine" : "unknown",
+        serverMessage ?? `recompute failed (HTTP ${res.status})`,
+        "The message above is the server's own, verbatim. Recompute refuses rather than writing a state it cannot justify, so the previous derived state is intact.",
+      );
   }
-  return payload as RecomputeResult;
 }
