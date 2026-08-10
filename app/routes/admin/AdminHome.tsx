@@ -83,8 +83,9 @@ export function AdminHome() {
             <Link className="btn-ghost" to="/admin/scorecards">
               Scorecards
             </Link>
-            {/* /admin/settings is still the shared-chrome stub (S0 owns it); it is
-                deliberately not linked from here until a slice builds it. */}
+            <Link className="btn-ghost" to="/admin/settings">
+              Settings &amp; season lock
+            </Link>
           </div>
         </div>
       </Section>
