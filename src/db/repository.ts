@@ -121,10 +121,17 @@ export async function loadRawSeason(
   // recompute must not inherit whatever order the planner happens to produce.
   // scoreMatch accumulates across lines, so a player's match total is the sum of
   // their innings lines.
+  //
+  // NOT_OUT AND MAIDENS ARE NO LONGER DROPPED IN TRANSIT (D28c). Migration 0006
+  // captured both — not_out because a duck (dismissed for 0) and an unbeaten 0
+  // are different events that runs alone cannot distinguish, maidens because O4
+  // scores them — but this loader selected neither, so the raw truth reached the
+  // engine incomplete no matter what the scoring config said. Storage was
+  // sufficient; the seam was not.
   const battingRows = await selectForSeason(
     db,
     seasonId,
-    `SELECT b.scorecard_id, b.innings, b.player_id, b.runs, b.balls_faced, b.fours, b.sixes
+    `SELECT b.scorecard_id, b.innings, b.player_id, b.runs, b.balls_faced, b.fours, b.sixes, b.not_out
        FROM batting_lines b JOIN scorecards s ON b.scorecard_id = s.id
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
       WHERE r.season_id = $1
@@ -133,7 +140,7 @@ export async function loadRawSeason(
   const bowlingRows = await selectForSeason(
     db,
     seasonId,
-    `SELECT b.scorecard_id, b.innings, b.player_id, b.overs, b.runs_conceded, b.wickets
+    `SELECT b.scorecard_id, b.innings, b.player_id, b.overs, b.runs_conceded, b.wickets, b.maidens
        FROM bowling_lines b JOIN scorecards s ON b.scorecard_id = s.id
        JOIN matches m ON s.match_id = m.id JOIN rounds r ON m.round_id = r.id
       WHERE r.season_id = $1
@@ -168,23 +175,27 @@ export async function loadRawSeason(
         .filter((r) => str(r.scorecard_id) === id)
         .map((r) => ({
           playerId: str(r.player_id),
+          innings: num(r.innings),
           runs: num(r.runs),
           ballsFaced: num(r.balls_faced),
           fours: num(r.fours),
           sixes: num(r.sixes),
+          notOut: bool(r.not_out),
         })),
       bowling: bowlingRows
         .filter((r) => str(r.scorecard_id) === id)
         .map((r) => ({
           playerId: str(r.player_id),
+          innings: num(r.innings),
           overs: num(r.overs),
           runsConceded: num(r.runs_conceded),
           wickets: num(r.wickets),
+          maidens: num(r.maidens),
         })),
       dismissals: dismissalRows
         .filter((r) => str(r.scorecard_id) === id)
         .sort((a, b) => num(a.innings) - num(b.innings) || num(a.seq) - num(b.seq))
-        .map((r) => str(r.resolved_text)),
+        .map((r) => ({ innings: num(r.innings), text: str(r.resolved_text) })),
     };
   });
   void scardIds;
@@ -347,9 +358,10 @@ export async function writeDerived(
     await insertRows(
       db,
       "player_match_scores",
-      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "base"],
+      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "second_innings_adjustment", "base"],
       derived.playerMatchScores.map((s) => [
-        s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.base,
+        s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses,
+        s.secondInningsAdjustment, s.base,
       ]),
     );
     await insertRows(
@@ -429,6 +441,7 @@ export async function readDerived(
     bowling: num(r.bowling),
     fielding: num(r.fielding),
     bonuses: num(r.bonuses),
+    secondInningsAdjustment: num(r.second_innings_adjustment),
     base: num(r.base),
   }));
 

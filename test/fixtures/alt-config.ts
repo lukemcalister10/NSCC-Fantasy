@@ -9,13 +9,31 @@ import type { LeagueConfig } from "../../src/config/types.js";
  * `src/config/types.ts`. Thresholds (SR ≥ 150, econ ≤ 3.0, min balls/overs) are
  * held identical to the fixture so the same bonus edges apply; the POINT VALUES
  * all change, which is what G11 proves is config-driven.
+ *
+ * THE O4 KEYS ADDED BY THE ENGINE SLICE. Those that are INERT on the two
+ * reference scorecards carry values that DIFFER from the fixture (not-out,
+ * maiden, 5WI and the second-innings multiplier — the cards contain no unbeaten
+ * innings, no maidens, no five-for and no second innings), so they are covered by
+ * the settings page's "the two economies really are different" sweep. Those that
+ * WOULD bite on these cards (the milestone bonuses, the duck, the continuous
+ * economy bonus) are held at zero here on purpose: this file's expectations in
+ * test/g11.config-economy.test.ts are hand-scored, and leaving them arithmetically
+ * untouched is what lets the G11 artifact stand unmoved beside the G1 one. The new
+ * keys are exercised against their own hand-scored card in
+ * test/o4.scoring-shape.test.ts, under the season-shaped config in ./o4-config.ts.
  */
 export const ALT_CONFIG: LeagueConfig = {
   scoring: {
     perRun: 2,
     perFour: 2,
     perSix: 4,
+    perFifty: 0,
+    perCentury: 0,
+    perDuck: 0,
+    perNotOut: 7,
     perWicket: 20,
+    perMaiden: 3,
+    perFiveWicketHaul: 25,
     perCatch: 10,
     perKeeperCatch: 12,
     perStumping: 15,
@@ -27,6 +45,8 @@ export const ALT_CONFIG: LeagueConfig = {
     econBonusPoints: 20,
     econBonusMaxEconomy: 3.0,
     econBonusMinOvers: 3,
+    econBonusPerNetBall: 0,
+    secondInningsMultiplier: 0.5,
   },
   pricing: {
     alpha: 0.25,

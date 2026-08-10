@@ -92,6 +92,24 @@ const insTrade = (db: DbClient, id: string, team: string, round: string, price =
     [id, team, PB1, price, round],
   );
 
+/**
+ * A whole founding squad bought in one go — the shape a TRADE write must take to
+ * COMMIT since D26 / migration 0010, because the ledger materialises into the
+ * selection set and a lone buy would leave a one-player team for the composition
+ * guard to refuse (pinned in test/g15). RLS is what this file is about, and it is
+ * unaffected: the writes below are still made as the participant, under their own
+ * role, and still succeed or fail on ownership.
+ */
+let trdc = 0;
+async function buyWholeSquad(db: DbClient, team: string, round: string): Promise<void> {
+  for (const [pid] of SQUAD) {
+    await db.query(
+      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'buy',$3,40000,$4)",
+      [`00000000-0000-0000-0000-13d7e${String(trdc++).padStart(7, "0")}`, team, pid, round],
+    );
+  }
+}
+
 /** Seed the raw scaffold as the bootstrap superuser (RLS bypassed): one season, three
  *  team-owning profiles + a manager + a team-less owner, six players, two teams, two
  *  rounds. R_OPEN locks in the future; R_LOCKED locked one second ago. */
@@ -166,11 +184,10 @@ describe("G13 AUTH_BOUNDARY — RLS enforced in the DB", () => {
     await expect(
       asAuthed(db, authed(OWNER_A), () => insertSquad(db, FT_A, R_OPEN)),
     ).resolves.toBeUndefined();
-    // Own trade committed as OWNER_A (founding buy: exempt from the count, within cap).
+    // Own trades committed as OWNER_A (founding build: exempt from the count, within cap).
     await expect(
-      asAuthed(db, authed(OWNER_A), () =>
-        insTrade(db, "00000000-0000-0000-0000-000000013e01", FT_A, R_OPEN)),
-    ).resolves.toBeDefined();
+      asAuthed(db, authed(OWNER_A), () => buyWholeSquad(db, FT_A, R_OPEN)),
+    ).resolves.toBeUndefined();
     // OWNER_A reads their own selections (own => always visible, even in an open round).
     const own = await asAuthed(db, authed(OWNER_A), () =>
       db.query<{ n: number }>(
@@ -246,13 +263,15 @@ describe("G13 AUTH_BOUNDARY — RLS enforced in the DB", () => {
         return insTrade(db, "00000000-0000-0000-0000-000000013e07", FT_A, R_LOCKED);
       }),
     ).rejects.toThrow(/locked/);
-    // Manager's repair hatch: bypass honoured -> the same locked-round write succeeds.
+    // Manager's repair hatch: bypass honoured -> a locked-round write succeeds.
+    // Written as a whole founding build so the team ends on a legal squad; the
+    // hatch, not the composition guard, is what this case is probing.
     await expect(
       asAuthed(db, authed(MANAGER), async () => {
         await db.query("SET LOCAL app.locks_bypass = 'on'");
-        return insTrade(db, "00000000-0000-0000-0000-000000013e08", FT_A, R_LOCKED);
+        return buyWholeSquad(db, FT_A, R_LOCKED);
       }),
-    ).resolves.toBeDefined();
+    ).resolves.toBeUndefined();
   });
 
   it("8. cross-read is lock-gated (Decision 3): rival blind pre-lock, visible post-lock", async () => {

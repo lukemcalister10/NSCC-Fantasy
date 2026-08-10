@@ -64,6 +64,8 @@ export function PlayerProfile() {
   const overallMove =
     p.currentPrice !== null && seedPrice !== null ? p.currentPrice - seedPrice : 0;
   const played = p.scores.filter((s) => s.played).length;
+  // The breakdown must reconcile: bat + bowl + field + bonus + this = pts (D28).
+  const showSecondInnings = p.scores.some((s) => s.second_innings_adjustment !== 0);
 
   return (
     <div className="page">
@@ -144,6 +146,11 @@ export function PlayerProfile() {
                 <th className="col-num">Bowl</th>
                 <th className="col-num">Field</th>
                 <th className="col-num">Bonus</th>
+                {/* D28: shown ONLY when the season actually halves (or otherwise
+                    scales) second innings AND this player earned points in one.
+                    Under a 1.0 multiplier every value is 0 and the column would
+                    be a row of zeroes explaining nothing. */}
+                {showSecondInnings && <th className="col-num">2nd inns</th>}
                 <th className="col-num col-pts">Pts</th>
               </tr>
             </thead>
@@ -166,12 +173,15 @@ export function PlayerProfile() {
                       <td className="col-num num">{s.bowling}</td>
                       <td className="col-num num">{s.fielding}</td>
                       <td className="col-num num">{s.bonuses}</td>
+                      {showSecondInnings && (
+                        <td className="col-num num">{s.second_innings_adjustment}</td>
+                      )}
                       <td className="col-num num col-pts">
                         <span className="score-chip">{s.base}</span>
                       </td>
                     </>
                   ) : (
-                    <td colSpan={5} className="dnp-cell">
+                    <td colSpan={showSecondInnings ? 6 : 5} className="dnp-cell">
                       Did not play
                     </td>
                   )}

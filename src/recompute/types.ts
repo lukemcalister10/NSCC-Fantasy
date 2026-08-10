@@ -47,19 +47,52 @@ export interface RawMatch {
   finalisedAt: string | null;
 }
 
+/**
+ * THE THREE TYPE-CONTRACT GAPS THIS SLICE CLOSES (D28c). Migration 0006 gave the
+ * database everything O4 and the second-innings multiplier need — `innings` on
+ * all three line tables, `not_out` on batting, `maidens` on bowling — but the raw
+ * contract had nowhere to put any of it, so repository.ts dropped it in transit
+ * and dismissals arrived as a bare string[] with no innings at all. Storage was
+ * sufficient; the type contract was not.
+ *
+ * These fields are REQUIRED here, not optional as on the engine's input types:
+ * every one of them is NOT NULL in the database, so anything less would be the
+ * contract lying about what the raw truth guarantees.
+ */
 export interface RawBattingLine {
   playerId: string;
+  /** Club innings this line belongs to (D27), 1-based. */
+  innings: number;
   runs: number;
   ballsFaced: number;
   fours: number;
   sixes: number;
+  /** Batter was unbeaten — O4's not-out bonus vs a duck (0006). */
+  notOut: boolean;
 }
 
 export interface RawBowlingLine {
   playerId: string;
+  /** Club innings this line belongs to (D27), 1-based. */
+  innings: number;
   overs: number;
   runsConceded: number;
   wickets: number;
+  /** Maiden overs bowled (O4 "maiden 1", 0006). */
+  maidens: number;
+}
+
+/**
+ * One opposition dismissal, with the innings it fell in. `text` is
+ * `dismissals.resolved_text`: the CANONICAL, engine-facing string whose fielder
+ * positions hold player ids, resolved against the registry under D22 at entry
+ * time (D25). `source_text` is audit material and is deliberately never loaded —
+ * recompute must be a function of canonical raw truth only.
+ */
+export interface RawDismissal {
+  /** Club innings this dismissal belongs to (D27), 1-based. */
+  innings: number;
+  text: string;
 }
 
 export interface RawScorecard {
@@ -71,8 +104,8 @@ export interface RawScorecard {
   lineup: string[];
   batting: RawBattingLine[];
   bowling: RawBowlingLine[];
-  /** Opposition dismissal strings, in order -> club fielding credits. */
-  dismissals: string[];
+  /** Opposition dismissals, in (innings, seq) order -> club fielding credits. */
+  dismissals: RawDismissal[];
 }
 
 export interface RawFantasyTeam {
@@ -120,11 +153,21 @@ export interface DerivedPlayerMatchScore {
   matchId: string;
   playerId: string;
   played: boolean;
+  /** Face-value component sums across all innings (unmultiplied). */
   batting: number;
   bowling: number;
   fielding: number;
   bonuses: number;
-  /** Pre-captaincy; drives pricing (D1/G7). */
+  /**
+   * The second-innings multiplier's whole effect as one auditable term (D28):
+   * round_half_up(second × m) − second. Zero under the fixture config (m = 1.0)
+   * and zero for any one-innings match, so every pre-existing derived row keeps
+   * the value it had. Stored (migration 0009) so `base` equals its own
+   * components and the operator can check the arithmetic by hand.
+   */
+  secondInningsAdjustment: number;
+  /** batting + bowling + fielding + bonuses + secondInningsAdjustment.
+   *  Pre-captaincy; drives pricing (D1/G7). */
   base: number;
 }
 

@@ -48,9 +48,13 @@ const teamRoundScores: DerivedTeamRoundScore[] = [
   { fantasyTeamId: t5, roundId: R1, total: 40, captainPlayerId: null },
 ];
 
+// D29: the round carries its own seq, and the fixture index is seq − 1. This
+// round is seq 1 → index 0 — the same index the old positional rule produced for
+// it — so every expectation below is untouched and the gate stays green
+// BYTE-IDENTICALLY across the D29 change. Only the input SHAPE moved.
 const h2h = computeH2hResults({
   teamIds: TEAMS,
-  activeRoundIdsBySeq: [R1],
+  activeRounds: [{ id: R1, seq: 1 }],
   teamRoundScores,
 });
 

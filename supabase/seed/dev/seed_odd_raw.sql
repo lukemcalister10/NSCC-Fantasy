@@ -30,7 +30,7 @@ DELETE FROM players WHERE season_id = '5ea50dd0-0000-4000-8000-000000000001';
 DELETE FROM seasons WHERE id = '5ea50dd0-0000-4000-8000-000000000001';
 
 INSERT INTO seasons (id, name, config) VALUES
-('5ea50dd0-0000-4000-8000-000000000001', 'NSCC Fantasy — Dev Season (odd team count, bye)', '{"scoring":{"perRun":1,"perFour":1,"perSix":2,"perWicket":25,"perCatch":8,"perKeeperCatch":8,"perStumping":10,"perRunOutUnassisted":10,"perRunOutAssisted":5,"srBonusPoints":10,"srBonusMinStrikeRate":150,"srBonusMinBalls":10,"econBonusPoints":10,"econBonusMaxEconomy":3,"econBonusMinOvers":3},"pricing":{"alpha":0.2,"dollarsPerPoint":1000,"floor":9000,"roundingIncrement":100,"startingPriceGamesCap":4},"squad":{"teamSize":6,"roleMinimums":{"BAT":2,"WK":1,"BWL":2,"AR":1},"cap":1000000,"tradesPerRound":2}}'::jsonb);
+('5ea50dd0-0000-4000-8000-000000000001', 'NSCC Fantasy — Dev Season (odd team count, bye)', '{"scoring":{"perRun":1,"perFour":1,"perSix":2,"perFifty":0,"perCentury":0,"perDuck":0,"perNotOut":0,"perWicket":25,"perMaiden":0,"perFiveWicketHaul":0,"perCatch":8,"perKeeperCatch":8,"perStumping":10,"perRunOutUnassisted":10,"perRunOutAssisted":5,"srBonusPoints":10,"srBonusMinStrikeRate":150,"srBonusMinBalls":10,"econBonusPoints":10,"econBonusMaxEconomy":3,"econBonusMinOvers":3,"econBonusPerNetBall":0,"secondInningsMultiplier":1},"pricing":{"alpha":0.2,"dollarsPerPoint":1000,"floor":9000,"roundingIncrement":100,"startingPriceGamesCap":4},"squad":{"teamSize":6,"roleMinimums":{"BAT":2,"WK":1,"BWL":2,"AR":1},"cap":1000000,"tradesPerRound":2}}'::jsonb);
 
 INSERT INTO players (id, season_id, registry_key, display_name, role, wk_eligible, starting_price, active) VALUES
 ('71a70dd0-0000-4000-8000-000000000001', '5ea50dd0-0000-4000-8000-000000000001', 'o01', 'A. Abbott', 'BAT', false, 150000, true),
@@ -77,31 +77,31 @@ INSERT INTO scorecard_lineup (scorecard_id, player_id) VALUES
 ('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-00000000000c'),
 ('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-00000000000d');
 
-INSERT INTO batting_lines (scorecard_id, player_id, runs, balls_faced, fours, sixes) VALUES
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000001', 72, 58, 9, 1),
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000002', 34, 16, 4, 1),
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000003', 5, 12, 0, 0),
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000005', 18, 20, 2, 0),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-000000000002', 12, 20, 1, 0),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-000000000003', 61, 44, 7, 2),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-000000000004', 40, 35, 5, 0),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-000000000006', 25, 19, 3, 0);
+INSERT INTO batting_lines (scorecard_id, innings, player_id, runs, balls_faced, fours, sixes, not_out) VALUES
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000001', 72, 58, 9, 1, false),
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000002', 34, 16, 4, 1, false),
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000003', 5, 12, 0, 0, false),
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000005', 18, 20, 2, 0, true),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-000000000002', 12, 20, 1, 0, false),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-000000000003', 61, 44, 7, 2, false),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-000000000004', 40, 35, 5, 0, true),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-000000000006', 25, 19, 3, 0, false);
 
-INSERT INTO bowling_lines (scorecard_id, player_id, overs, runs_conceded, wickets) VALUES
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000007', 6, 14, 3),
-('5cad0dd0-0000-4000-8000-000000000001', '71a70dd0-0000-4000-8000-000000000008', 5, 33, 1),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-000000000009', 7, 20, 2),
-('5cad0dd0-0000-4000-8000-000000000002', '71a70dd0-0000-4000-8000-00000000000a', 4, 30, 0);
+INSERT INTO bowling_lines (scorecard_id, innings, player_id, overs, runs_conceded, wickets, maidens) VALUES
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000007', 6, 14, 3, 2),
+('5cad0dd0-0000-4000-8000-000000000001', 1, '71a70dd0-0000-4000-8000-000000000008', 5, 33, 1, 0),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-000000000009', 7, 20, 2, 1),
+('5cad0dd0-0000-4000-8000-000000000002', 1, '71a70dd0-0000-4000-8000-00000000000a', 4, 30, 0, 0);
 
-INSERT INTO dismissals (scorecard_id, seq, resolved_text) VALUES
-('5cad0dd0-0000-4000-8000-000000000001', 0, 'c 71a70dd0-0000-4000-8000-00000000000b b 71a70dd0-0000-4000-8000-000000000008'),
-('5cad0dd0-0000-4000-8000-000000000001', 1, 'c 71a70dd0-0000-4000-8000-000000000005 b 71a70dd0-0000-4000-8000-000000000007'),
-('5cad0dd0-0000-4000-8000-000000000001', 2, 'st 71a70dd0-0000-4000-8000-000000000005 b 71a70dd0-0000-4000-8000-000000000007'),
-('5cad0dd0-0000-4000-8000-000000000001', 3, 'run out (71a70dd0-0000-4000-8000-00000000000b)'),
-('5cad0dd0-0000-4000-8000-000000000002', 0, 'c 71a70dd0-0000-4000-8000-00000000000c b 71a70dd0-0000-4000-8000-000000000009'),
-('5cad0dd0-0000-4000-8000-000000000002', 1, 'c 71a70dd0-0000-4000-8000-000000000006 b 71a70dd0-0000-4000-8000-000000000009'),
-('5cad0dd0-0000-4000-8000-000000000002', 2, 'run out (71a70dd0-0000-4000-8000-00000000000d/71a70dd0-0000-4000-8000-00000000000c)'),
-('5cad0dd0-0000-4000-8000-000000000002', 3, 'b 71a70dd0-0000-4000-8000-00000000000a');
+INSERT INTO dismissals (scorecard_id, innings, seq, resolved_text) VALUES
+('5cad0dd0-0000-4000-8000-000000000001', 1, 0, 'c 71a70dd0-0000-4000-8000-00000000000b b 71a70dd0-0000-4000-8000-000000000008'),
+('5cad0dd0-0000-4000-8000-000000000001', 1, 1, 'c 71a70dd0-0000-4000-8000-000000000005 b 71a70dd0-0000-4000-8000-000000000007'),
+('5cad0dd0-0000-4000-8000-000000000001', 1, 2, 'st 71a70dd0-0000-4000-8000-000000000005 b 71a70dd0-0000-4000-8000-000000000007'),
+('5cad0dd0-0000-4000-8000-000000000001', 1, 3, 'run out (71a70dd0-0000-4000-8000-00000000000b)'),
+('5cad0dd0-0000-4000-8000-000000000002', 1, 0, 'c 71a70dd0-0000-4000-8000-00000000000c b 71a70dd0-0000-4000-8000-000000000009'),
+('5cad0dd0-0000-4000-8000-000000000002', 1, 1, 'c 71a70dd0-0000-4000-8000-000000000006 b 71a70dd0-0000-4000-8000-000000000009'),
+('5cad0dd0-0000-4000-8000-000000000002', 1, 2, 'run out (71a70dd0-0000-4000-8000-00000000000d/71a70dd0-0000-4000-8000-00000000000c)'),
+('5cad0dd0-0000-4000-8000-000000000002', 1, 3, 'b 71a70dd0-0000-4000-8000-00000000000a');
 
 INSERT INTO fantasy_teams (id, season_id, owner_profile_id, name) VALUES
 ('7ea70dd0-0000-4000-8000-000000000001', '5ea50dd0-0000-4000-8000-000000000001', '__OWNER_A__', 'Adelaide Antics'),

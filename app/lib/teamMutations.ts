@@ -152,23 +152,13 @@ function throwOn(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
 
-/**
- * "These rows already exist" — Postgres 23505 against
- * `selections UNIQUE (fantasy_team_id, round_id, player_id)` (0001:162).
- *
- * This is a BENIGN outcome for carry-forward specifically, and only there. The
- * database is right to refuse a second copy of a selection set; what was wrong
- * was asking. When it happens the correct response is to re-read and carry on —
- * the round already holds exactly what the attempt was going to write — not to
- * accuse the participant of a refusal they did not cause (C7).
- *
- * It stays a REFUSAL everywhere else: an explicit captaincy change or a repair
- * that hits this has genuinely lost a race, and the participant needs to know.
- */
-export function isAlreadyMaterialised(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return /duplicate key value violates unique constraint/i.test(message);
-}
+// C7'S DUPLICATE-KEY TOLERANCE IS GONE, WITH ITS CAUSE (D26 / migration 0010).
+// `isAlreadyMaterialised` existed to treat "these selection rows already exist"
+// as benign during client-side carry-forward. There is no client-side
+// carry-forward any more — the database is the single writer — so nothing can
+// legitimately race it, and a helper that swallows a unique-constraint refusal is
+// exactly the sort of thing that quietly hides a real divergence if it is left
+// lying around for a future caller to reach for. Removed rather than kept.
 
 // ---------------------------------------------------------------------------
 // Team registration (pre-lock only — D21/G10 freezes the team set at lock)
@@ -468,4 +458,23 @@ export async function setCaptaincy(args: {
   captaincy: Captaincy;
 }): Promise<void> {
   return syncSelectionsToHoldings(args);
+}
+
+/**
+ * ASK THE DATABASE TO RE-MATERIALISE this round's selection set from the ledger
+ * (D26 / migration 0010, closing follow-up F1).
+ *
+ * The client no longer materialises anything itself — the trigger does, inside
+ * the trade's own transaction, so ledger and selections cannot come apart the way
+ * F2/F3's atomicity seam allowed. This is the reconciliation control's button,
+ * and it is a REQUEST, not a write: `public.materialise_selections` re-runs the
+ * one function in the system that writes selection rows, for the caller's own
+ * team only. Returns how many players are fielded afterwards.
+ */
+export async function requestMaterialisation(roundId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("materialise_selections", {
+    p_round: roundId,
+  });
+  throwOn(error);
+  return typeof data === "number" ? data : 0;
 }

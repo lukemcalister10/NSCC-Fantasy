@@ -39,6 +39,7 @@ const PLW = "00000000-0000-0000-0000-0000000004d2"; // WK
 const PLB1 = "00000000-0000-0000-0000-0000000004d3"; // BWL
 const PLB2 = "00000000-0000-0000-0000-0000000004d4"; // BWL
 const PLA = "00000000-0000-0000-0000-0000000004d5"; // AR
+const PLSP = "00000000-0000-0000-0000-0000000004d6"; // BAT, the spare a repair trades in
 
 // Trade ids used across the cases (selections are seeded as whole squads).
 const T_OPEN = "00000000-0000-0000-0000-000000040101";
@@ -58,6 +59,7 @@ function buildRaw(): RawSeason {
       { id: PLB1, registryKey: "plb1", displayName: "PLB1", role: "BWL", wkEligible: false, startingPrice: 50_000, active: true },
       { id: PLB2, registryKey: "plb2", displayName: "PLB2", role: "BWL", wkEligible: false, startingPrice: 50_000, active: true },
       { id: PLA, registryKey: "pla", displayName: "PLA", role: "AR", wkEligible: false, startingPrice: 40_000, active: true },
+      { id: PLSP, registryKey: "plsp", displayName: "PLSP", role: "BAT", wkEligible: false, startingPrice: 40_000, active: true },
     ],
     rounds: [
       { id: R_OPEN, seq: 1, name: "Open", lockAt: "2099-01-01T00:00:00Z" },
@@ -110,12 +112,37 @@ const insTrade = (db: DbClient, id: string, roundId: string) =>
     [id, FT, PL, roundId],
   );
 
+/**
+ * A whole founding squad bought in ONE transaction — used wherever a TRADE write
+ * must SUCCEED.
+ *
+ * Since D26 / migration 0010 the trades ledger materialises into the selection
+ * set, so a lone buy ends the transaction on a one-player team and the deferred
+ * composition guard refuses it (pinned in test/g15). A trade that is expected to
+ * commit therefore has to be a complete, legal build — which is what the UI
+ * writes anyway. The REJECTION cases below are unaffected and still use a lone
+ * insert: the round-lock guard is a BEFORE trigger, so it fires immediately, long
+ * before any deferred check could speak.
+ */
+let trdc = 0;
+const trdId = () => `00000000-0000-0000-0000-04c7d${String(trdc++).padStart(7, "0")}`;
+async function buyWholeSquad(db: DbClient, roundId: string): Promise<void> {
+  await db.query("BEGIN");
+  for (const [pid] of SQUAD) {
+    await db.query(
+      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'buy',$3,40000,$4)",
+      [trdId(), FT, pid, roundId],
+    );
+  }
+  await db.query("COMMIT");
+}
+
 describe("G4 LOCK_ENFORCEMENT — round lock enforced in the DB", () => {
   it("selection/trade succeed pre-lock and are rejected at lock+1s (per-round)", async () => {
     const db = await setup();
     // Pre-lock (R_OPEN): a legal squad and a trade both succeed.
     await expect(seedSquad(db, R_OPEN)).resolves.toBeUndefined();
-    await expect(insTrade(db, T_OPEN, R_OPEN)).resolves.toBeDefined();
+    await expect(buyWholeSquad(db, R_OPEN)).resolves.toBeUndefined();
     // lock+1s (R_LOCKED): the SAME writes are rejected server-side. The round-lock
     // BEFORE trigger fires immediately, before any deferred composition check — so a
     // lone insert is a faithful "team change at lock+1s" probe.
@@ -144,11 +171,29 @@ describe("G4 LOCK_ENFORCEMENT — round lock enforced in the DB", () => {
 
   it("the app.locks_bypass repair hatch permits a locked-round write; default rejects (Rider 2)", async () => {
     const db = await setup();
+    // The team holds a legal squad, bought in the open round.
+    await buyWholeSquad(db, R_OPEN);
+
     // Default (unset): a trade into the locked round is rejected.
     await expect(insTrade(db, "00000000-0000-0000-0000-000000040119", R_LOCKED)).rejects.toThrow(/locked/);
-    // Bypass on: the manager's fix path lets the same write through.
+
+    // Bypass on: the manager's fix path lets the write through. Written as the
+    // repair it actually is — a sell and a buy as one pair, which is the shape
+    // Rider 2 exists for (a trade that has to be corrected after the round
+    // locked). The team still holds six at the end, so the only guard with
+    // anything to say is the round lock, which is the one under test.
     await db.query("SET app.locks_bypass = 'on'");
-    await expect(insTrade(db, T_BYPASS, R_LOCKED)).resolves.toBeDefined();
+    await db.query("BEGIN");
+    await db.query(
+      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'sell',$3,40000,$4)",
+      ["00000000-0000-0000-0000-000000040103", FT, PL2, R_LOCKED],
+    );
+    await db.query(
+      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'buy',$3,40000,$4)",
+      [T_BYPASS, FT, PLSP, R_LOCKED],
+    );
+    await expect(db.query("COMMIT")).resolves.toBeDefined();
+
     // Bypass off again: back to rejecting.
     await db.query("SET app.locks_bypass = 'off'");
     await expect(insTrade(db, "00000000-0000-0000-0000-000000040129", R_LOCKED)).rejects.toThrow(/locked/);

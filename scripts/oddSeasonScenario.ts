@@ -42,6 +42,15 @@ export const R2 = "40110dd0-0000-4000-8000-000000000002";
 export const R3 = "40110dd0-0000-4000-8000-000000000003";
 const M1 = "3a7c0dd0-0000-4000-8000-000000000001"; // finalised, round 1
 const M2 = "3a7c0dd0-0000-4000-8000-000000000002"; // finalised, round 2
+/**
+ * Both demo cards are ONE-INNINGS matches, so every line and every dismissal
+ * belongs to innings 1 (D27). Spelled out rather than defaulted because the raw
+ * contract makes `innings` required — the database column is NOT NULL, and a seed
+ * that omitted it would be describing a scorecard the database cannot hold.
+ */
+const INNINGS_1 = 1;
+const dis = (text: string) => ({ innings: INNINGS_1, text });
+
 const SC1 = "5cad0dd0-0000-4000-8000-000000000001";
 const SC2 = "5cad0dd0-0000-4000-8000-000000000002";
 
@@ -207,22 +216,22 @@ function buildRaw(r2Trades: RawTrade[]): RawSeason {
         reviewState: "committed",
         lineup: m1Lineup,
         batting: [
-          { playerId: pid(1), runs: 72, ballsFaced: 58, fours: 9, sixes: 1 },
-          { playerId: pid(2), runs: 34, ballsFaced: 16, fours: 4, sixes: 1 },
-          { playerId: pid(3), runs: 5, ballsFaced: 12, fours: 0, sixes: 0 },
-          { playerId: pid(5), runs: 18, ballsFaced: 20, fours: 2, sixes: 0 },
+          { playerId: pid(1), innings: INNINGS_1, runs: 72, ballsFaced: 58, fours: 9, sixes: 1, notOut: false },
+          { playerId: pid(2), innings: INNINGS_1, runs: 34, ballsFaced: 16, fours: 4, sixes: 1, notOut: false },
+          { playerId: pid(3), innings: INNINGS_1, runs: 5, ballsFaced: 12, fours: 0, sixes: 0, notOut: false },
+          { playerId: pid(5), innings: INNINGS_1, runs: 18, ballsFaced: 20, fours: 2, sixes: 0, notOut: true },
         ],
         bowling: [
-          { playerId: pid(7), overs: 6, runsConceded: 14, wickets: 3 },
-          { playerId: pid(8), overs: 5, runsConceded: 33, wickets: 1 },
+          { playerId: pid(7), innings: INNINGS_1, overs: 6, runsConceded: 14, wickets: 3, maidens: 2 },
+          { playerId: pid(8), innings: INNINGS_1, overs: 5, runsConceded: 33, wickets: 1, maidens: 0 },
         ],
         // D25: fielders named by CANONICAL PLAYER ID, the identifier the lineup
         // holds — otherwise no fielding credit lands through the database path.
         dismissals: [
-          `c ${pid(11)} b ${pid(8)}`, // K. Kendrick, outfield catch
-          `c ${pid(5)} b ${pid(7)}`, // E. Ennis keeping — keeper catch
-          `st ${pid(5)} b ${pid(7)}`, // E. Ennis, stumping
-          `run out (${pid(11)})`, // K. Kendrick, unassisted
+          dis(`c ${pid(11)} b ${pid(8)}`), // K. Kendrick, outfield catch
+          dis(`c ${pid(5)} b ${pid(7)}`), // E. Ennis keeping — keeper catch
+          dis(`st ${pid(5)} b ${pid(7)}`), // E. Ennis, stumping
+          dis(`run out (${pid(11)})`), // K. Kendrick, unassisted
         ],
       },
       {
@@ -232,20 +241,20 @@ function buildRaw(r2Trades: RawTrade[]): RawSeason {
         reviewState: "committed",
         lineup: m2Lineup,
         batting: [
-          { playerId: pid(2), runs: 12, ballsFaced: 20, fours: 1, sixes: 0 },
-          { playerId: pid(3), runs: 61, ballsFaced: 44, fours: 7, sixes: 2 },
-          { playerId: pid(4), runs: 40, ballsFaced: 35, fours: 5, sixes: 0 },
-          { playerId: pid(6), runs: 25, ballsFaced: 19, fours: 3, sixes: 0 },
+          { playerId: pid(2), innings: INNINGS_1, runs: 12, ballsFaced: 20, fours: 1, sixes: 0, notOut: false },
+          { playerId: pid(3), innings: INNINGS_1, runs: 61, ballsFaced: 44, fours: 7, sixes: 2, notOut: false },
+          { playerId: pid(4), innings: INNINGS_1, runs: 40, ballsFaced: 35, fours: 5, sixes: 0, notOut: true },
+          { playerId: pid(6), innings: INNINGS_1, runs: 25, ballsFaced: 19, fours: 3, sixes: 0, notOut: false },
         ],
         bowling: [
-          { playerId: pid(9), overs: 7, runsConceded: 20, wickets: 2 },
-          { playerId: pid(10), overs: 4, runsConceded: 30, wickets: 0 },
+          { playerId: pid(9), innings: INNINGS_1, overs: 7, runsConceded: 20, wickets: 2, maidens: 1 },
+          { playerId: pid(10), innings: INNINGS_1, overs: 4, runsConceded: 30, wickets: 0, maidens: 0 },
         ],
         dismissals: [
-          `c ${pid(12)} b ${pid(9)}`, // L. Lowry, outfield catch
-          `c ${pid(6)} b ${pid(9)}`, // F. Fraser keeping — keeper catch
-          `run out (${pid(13)}/${pid(12)})`, // assisted, credited to both
-          `b ${pid(10)}`, // bowled — no fielding credit
+          dis(`c ${pid(12)} b ${pid(9)}`), // L. Lowry, outfield catch
+          dis(`c ${pid(6)} b ${pid(9)}`), // F. Fraser keeping — keeper catch
+          dis(`run out (${pid(13)}/${pid(12)})`), // assisted, credited to both
+          dis(`b ${pid(10)}`), // bowled — no fielding credit
         ],
       },
     ],

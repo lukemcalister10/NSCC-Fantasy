@@ -287,26 +287,38 @@ describe("trades — pairs, limits and the founding exemption (G15)", () => {
     ).resolves.toBeDefined();
   });
 
+  // EVERY TRADE BELOW IS A PAIR, because since D26 / migration 0010 the ledger
+  // materialises into the selection set and a write that leaves the squad the
+  // wrong size is refused by the COMPOSITION guard. Writing pairs keeps the squad
+  // legal, so the guard under test — the trade COUNT — is unambiguously the one
+  // that speaks (or stays silent). It is also exactly what executeTradePair writes.
+  const SWAPS: ReadonlyArray<readonly [string, string]> = [
+    [BAT2, BATE], // BAT out, BAT in
+    [BWL2, BWLE], // BWL out, BWL in
+    [AR1, AR2], // AR out, AR in
+  ];
+  const pairsOf = (n: number) =>
+    SWAPS.slice(0, n).flatMap(([out, into]) => [
+      { kind: "sell" as const, player: out },
+      { kind: "buy" as const, player: into },
+    ]);
+
   it("trades AT the configured limit commit in a non-founding round", async () => {
     await asOwner(() =>
       insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
     );
-    const atLimit = [BATE, BWLE].slice(0, SQUAD.tradesPerRound);
-    expect(atLimit).toHaveLength(SQUAD.tradesPerRound);
-    await expect(
-      asOwner(() => insertTrades(atLimit.map((p) => ({ kind: "buy" as const, player: p })), R2)),
-    ).resolves.toBeDefined();
+    const atLimit = pairsOf(SQUAD.tradesPerRound);
+    expect(atLimit.filter((t) => t.kind === "buy")).toHaveLength(SQUAD.tradesPerRound);
+    await expect(asOwner(() => insertTrades(atLimit, R2))).resolves.toBeDefined();
   });
 
   it("one trade OVER the configured limit is refused", async () => {
     await asOwner(() =>
       insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
     );
-    const overLimit = [BATE, BWLE, AR2].slice(0, SQUAD.tradesPerRound + 1);
-    expect(overLimit).toHaveLength(SQUAD.tradesPerRound + 1);
-    await expect(
-      asOwner(() => insertTrades(overLimit.map((p) => ({ kind: "buy" as const, player: p })), R2)),
-    ).rejects.toThrow(/trades/i);
+    const overLimit = pairsOf(SQUAD.tradesPerRound + 1);
+    expect(overLimit.filter((t) => t.kind === "buy")).toHaveLength(SQUAD.tradesPerRound + 1);
+    await expect(asOwner(() => insertTrades(overLimit, R2))).rejects.toThrow(/trades/i);
   });
 
   it("a purchase over the salary cap is refused", async () => {
@@ -325,8 +337,18 @@ describe("trades — pairs, limits and the founding exemption (G15)", () => {
   });
 
   it("within the cap the same write commits", async () => {
+    // One expensive player inside a complete, legal founding squad: the other
+    // five are CHEAP, so the ledger stays under the cap.
     await expect(
-      asOwner(() => insertTrades([{ kind: "buy", player: RICH1, price: RICH }], R1)),
+      asOwner(() =>
+        insertTrades(
+          [
+            { kind: "buy", player: RICH1, price: RICH },
+            ...[BAT2, WK1, BWL1, BWL2, AR1].map((p) => ({ kind: "buy" as const, player: p })),
+          ],
+          R1,
+        ),
+      ),
     ).resolves.toBeDefined();
   });
 });
@@ -357,9 +379,23 @@ describe("lock states — refused server-side, not merely greyed out", () => {
   });
 
   it("the lock releases once the match is finalised", async () => {
+    // A legal squad first, so buying INMATCH is a PAIR that keeps it legal —
+    // otherwise the composition guard would answer before the mid-match lock got
+    // the chance to stay silent, and the release would not be what was proven.
+    await asOwner(() =>
+      insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
+    );
     await db.query("UPDATE matches SET status = 'finalised' WHERE id = $1", [MATCH]);
     await expect(
-      asOwner(() => insertTrades([{ kind: "buy", player: INMATCH }], R1)),
+      asOwner(() =>
+        insertTrades(
+          [
+            { kind: "sell", player: BAT2 },
+            { kind: "buy", player: INMATCH },
+          ],
+          R1,
+        ),
+      ),
     ).resolves.toBeDefined();
   });
 });

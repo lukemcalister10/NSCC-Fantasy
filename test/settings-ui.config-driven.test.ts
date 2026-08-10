@@ -143,7 +143,7 @@ function buildRaw(config: LeagueConfig): RawSeason {
         wicketKeeperPlayerId: null,
         reviewState: "committed",
         lineup: [A],
-        batting: [{ playerId: A, runs: 100, ballsFaced: 100, fours: 0, sixes: 0 }],
+        batting: [{ playerId: A, innings: 1, runs: 100, ballsFaced: 100, fours: 0, sixes: 0, notOut: false }],
         bowling: [],
         dismissals: [],
       },

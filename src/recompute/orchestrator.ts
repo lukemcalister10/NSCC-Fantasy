@@ -66,6 +66,7 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
         bowling: ps.bowling,
         fielding: ps.fielding,
         bonuses: ps.bonuses,
+        secondInningsAdjustment: ps.secondInningsAdjustment,
         base: ps.base,
       };
       playerMatchScores.push(row);
@@ -162,11 +163,20 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
   const activeRoundIds = new Set(
     raw.matches.filter((m) => activeStatuses.has(m.status)).map((m) => m.roundId),
   );
-  const activeRoundIdsBySeq = raw.rounds
+  // D29: the ROUND'S OWN NUMBER travels with it, not its position in this list.
+  // The H2H fixture index is seq − 1 and never the position among active rounds —
+  // otherwise an empty round later acquiring its first match shifts every later
+  // index by one and RETROACTIVELY REWRITES WHO PLAYED WHOM in rounds already
+  // settled. D19 makes that reachable (a round with no entered matches does not
+  // exist for H2H), and the operator has ruled out results changing with
+  // hindsight (D24, same principle). The list stays sorted by seq because the
+  // ORDER is still meaningful for emission; only the INDEX changed meaning.
+  const activeRoundsBySeq = raw.rounds
     .filter((r) => activeRoundIds.has(r.id))
     .slice()
     .sort((a, b) => a.seq - b.seq || cmp(a.id, b.id))
-    .map((r) => r.id);
+    .map((r) => ({ id: r.id, seq: r.seq }));
+  const activeRoundIdsBySeq = activeRoundsBySeq.map((r) => r.id);
 
   const teamIds = raw.fantasyTeams.map((t) => t.id).slice().sort(cmp);
   const roundIdByMatch = new Map(raw.matches.map((m) => [m.id, m.roundId]));
@@ -180,7 +190,7 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
   });
   const h2hResults = computeH2hResults({
     teamIds,
-    activeRoundIdsBySeq,
+    activeRounds: activeRoundsBySeq,
     teamRoundScores,
   });
   const ladder = computeLadder({ teamIds, teamRoundScores, h2hResults });
@@ -211,20 +221,32 @@ function buildCard(match: RawMatch, scorecard: RawScorecard): MatchScorecard {
     lineup: scorecard.lineup,
     captain: NO_CAPTAIN,
     viceCaptain: NO_CAPTAIN,
+    // INNINGS SURVIVES THE SEAM (D27/D28c). Every line carries the innings it
+    // belongs to, so the engine can total a player's SECOND-innings earnings and
+    // apply the multiplier. Before this slice buildCard flattened all lines into
+    // one card and the innings dimension was lost here, which is exactly why S-A
+    // could not build the multiplier and stopped rather than editing the engine.
     clubBatting: scorecard.batting.map((b) => ({
       player: b.playerId,
+      innings: b.innings,
       runs: b.runs,
       ballsFaced: b.ballsFaced,
       fours: b.fours,
       sixes: b.sixes,
+      notOut: b.notOut,
     })),
     clubBowling: scorecard.bowling.map((b) => ({
       player: b.playerId,
+      innings: b.innings,
       overs: b.overs,
       runsConceded: b.runsConceded,
       wickets: b.wickets,
+      maidens: b.maidens,
     })),
-    oppositionDismissals: scorecard.dismissals,
+    oppositionDismissals: scorecard.dismissals.map((d) => ({
+      innings: d.innings,
+      text: d.text,
+    })),
   };
   if (scorecard.wicketKeeperPlayerId) {
     card.wicketKeeper = scorecard.wicketKeeperPlayerId;

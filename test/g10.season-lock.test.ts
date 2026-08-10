@@ -52,7 +52,7 @@ function buildRaw(): RawSeason {
       { id: MATCH, roundId: ROUND, grade: "A", opponent: "Opp", status: "finalised", finalDayDate: "2026-10-04", finalisedAt: "2026-10-04T06:00:00Z" },
     ],
     scorecards: [
-      { id: SC, matchId: MATCH, wicketKeeperPlayerId: null, reviewState: "committed", lineup: [A], batting: [{ playerId: A, runs: 100, ballsFaced: 100, fours: 0, sixes: 0 }], bowling: [], dismissals: [] },
+      { id: SC, matchId: MATCH, wicketKeeperPlayerId: null, reviewState: "committed", lineup: [A], batting: [{ playerId: A, innings: 1, runs: 100, ballsFaced: 100, fours: 0, sixes: 0, notOut: false }], bowling: [], dismissals: [] },
     ],
     fantasyTeams: [{ id: FT, ownerProfileId: OWNER, name: "FT" }],
     selections: [],

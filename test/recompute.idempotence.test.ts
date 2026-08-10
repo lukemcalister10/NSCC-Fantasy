@@ -33,6 +33,10 @@ const OWNER = "00000000-0000-0000-0000-00000000000f";
 const OWNER2 = "00000000-0000-0000-0000-0000000000ef";
 const T1 = "00000000-0000-0000-0000-0000000000d1";
 const T2 = "00000000-0000-0000-0000-0000000000d2";
+const T3 = "00000000-0000-0000-0000-0000000000d3";
+const T4 = "00000000-0000-0000-0000-0000000000d4";
+const T5 = "00000000-0000-0000-0000-0000000000d5";
+const T6 = "00000000-0000-0000-0000-0000000000d6";
 const SEL1 = "00000000-0000-0000-0000-000000000101";
 const SEL2 = "00000000-0000-0000-0000-000000000102";
 const SEL3 = "00000000-0000-0000-0000-000000000103";
@@ -70,9 +74,9 @@ const SEL12 = "00000000-0000-0000-0000-00000000010c";
 function buildRaw(withExtra: boolean): RawSeason {
   const lineup = withExtra ? [A, B, X] : [A, B];
   const batting = [
-    { playerId: A, runs: 100, ballsFaced: 100, fours: 0, sixes: 0 },
+    { playerId: A, innings: 1, runs: 100, ballsFaced: 100, fours: 0, sixes: 0, notOut: false },
     ...(withExtra
-      ? [{ playerId: X, runs: 20, ballsFaced: 20, fours: 0, sixes: 0 }]
+      ? [{ playerId: X, innings: 1, runs: 20, ballsFaced: 20, fours: 0, sixes: 0, notOut: false }]
       : []),
   ];
   return {
@@ -108,8 +112,8 @@ function buildRaw(withExtra: boolean): RawSeason {
         reviewState: "committed",
         lineup,
         batting,
-        bowling: [{ playerId: B, overs: 4, runsConceded: 20, wickets: 2 }],
-        dismissals: ["c " + A + " b " + B], // A takes an outfield catch
+        bowling: [{ playerId: B, innings: 1, overs: 4, runsConceded: 20, wickets: 2, maidens: 0 }],
+        dismissals: [{ innings: 1, text: "c " + A + " b " + B }], // A takes an outfield catch
       },
     ],
     fantasyTeams: [
@@ -133,9 +137,19 @@ function buildRaw(withExtra: boolean): RawSeason {
       { id: SEL12, fantasyTeamId: FT2, roundId: R1, playerId: PAD_AR, isCaptain: false, isViceCaptain: false },
     ],
     // Round-1 trades at price-entering-round-1 = starting price (Rider 2 holds).
+    //
+    // THE LEDGER MUST HOLD EVERY SELECTED PLAYER (D26). Selections and holdings
+    // are one and the same, so a team cannot field a player it never bought —
+    // this used to buy only A and B while fielding six, which the client-side
+    // materialisation happened to tolerate and 0010's trigger correctly does not.
+    // FT1's founding build is all six, at their starting prices.
     trades: [
       { id: T1, fantasyTeamId: FT1, kind: "buy", playerId: A, price: 60_000, roundId: R1, createdAt: "2026-09-30T00:00:00Z" },
       { id: T2, fantasyTeamId: FT1, kind: "buy", playerId: B, price: 50_000, roundId: R1, createdAt: "2026-09-30T00:01:00Z" },
+      { id: T3, fantasyTeamId: FT1, kind: "buy", playerId: PAD_BAT, price: 9_000, roundId: R1, createdAt: "2026-09-30T00:02:00Z" },
+      { id: T4, fantasyTeamId: FT1, kind: "buy", playerId: PAD_WK, price: 9_000, roundId: R1, createdAt: "2026-09-30T00:03:00Z" },
+      { id: T5, fantasyTeamId: FT1, kind: "buy", playerId: PAD_BWL, price: 9_000, roundId: R1, createdAt: "2026-09-30T00:04:00Z" },
+      { id: T6, fantasyTeamId: FT1, kind: "buy", playerId: PAD_AR, price: 9_000, roundId: R1, createdAt: "2026-09-30T00:05:00Z" },
     ],
   };
 }

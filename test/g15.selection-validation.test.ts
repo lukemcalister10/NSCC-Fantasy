@@ -28,12 +28,16 @@ import type { DbClient } from "../src/db/repository.js";
  *       (the wk_eligible BAT is needed to MEET the BAT minimum, so it has no spare
  *       capacity to keep wicket — a naive count(WK OR wk_eligible)>=1 would wrongly
  *       pass this squad; strict counting rejects it.)
- *  Trades (team FT):
+ *  Trades (team FT). Since D26 / migration 0010, holdings ARE the selection set,
+ *  so every trade transaction must END on a legal squad — the trade cases below
+ *  are written as complete builds and as sell+buy PAIRS, which is also what the
+ *  UI writes. The tightening itself is pinned in the last describe block.
  *   - initial full-squad build (founding round R1, no prior holdings): 6 buys in
  *       one go COMMIT despite tradesPerRound 2 -> zero trades consumed
- *   - at the limit (non-founding round R2): 2 buys COMMIT
- *   - over the limit (non-founding round R2): 3 buys rejected /trades/
- *   - salary cap: a buy taking net spend over cap rejected /cap/; within cap COMMITS
+ *   - at the limit (non-founding round R2): 2 PAIRS COMMIT
+ *   - over the limit (non-founding round R2): 3 PAIRS rejected /trades/
+ *   - salary cap: a buy taking net spend over cap rejected /cap/; a founding
+ *       build inside the cap COMMITS
  *  Partial-config guard:
  *   - a season config missing squad.teamSize/roleMinimums -> selection rejected
  *       /config missing/ (loud, at validation time — never a silent pass)
@@ -112,6 +116,34 @@ const buy = (db: DbClient, pid: string, roundId: string, price: number) =>
     [trdId(), FT, pid, price, roundId],
   );
 
+const sell = (db: DbClient, pid: string, roundId: string, price: number) =>
+  db.query(
+    "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'sell',$3,$4,$5)",
+    [trdId(), FT, pid, price, roundId],
+  );
+
+/**
+ * A legal founding squad {2 BAT, 1 WK, 2 BWL, 1 AR} in the founding round.
+ *
+ * WHY EVERY TRADE TEST BELOW NOW STARTS FROM A COMPLETE SQUAD (D26 / migration
+ * 0010). Selections are materialised from the trades ledger, so a transaction
+ * that leaves the team holding anything other than teamSize players now produces
+ * an illegal selection set and the COMPOSITION guard refuses it at COMMIT. These
+ * tests used to isolate the trade guards with a lone buy; a lone buy is no longer
+ * a legal position to end a transaction in.
+ *
+ * That is the tightening A12 asked for, not a workaround: G15's composition check
+ * now fires IN FRONT OF the participant at trade time rather than silently at lock
+ * with nobody watching. It is pinned in its own right at the bottom of this file.
+ */
+async function foundSquad(db: DbClient, price = 9_000): Promise<void> {
+  await db.query("BEGIN");
+  for (const pid of FOUNDING) await buy(db, pid, R1, price);
+  await db.query("COMMIT");
+}
+
+const FOUNDING = [BAT1, BAT2, WK1, BWL1, BWL2, AR1];
+
 describe("G15 — selection composition / size / WK, at commit", () => {
   it("a valid squad {2 BAT,1 WK,2 BWL,1 AR} commits", async () => {
     const db = await makeTestDb();
@@ -169,21 +201,31 @@ describe("G15 — trade limits and salary cap, at commit", () => {
   it("trades at the limit (2 buys in a non-founding round) commit", async () => {
     const db = await makeTestDb();
     await seedSeason(db, buildRaw());
-    await buy(db, BAT1, R1, 9_000); // founding R1 → establishes prior holdings for R2
+    await foundSquad(db); // founding R1 → establishes prior holdings for R2
+    // TWO PAIRS, each one sell + one buy, so the squad stays size 6 and legal:
+    // BAT2 → BATE (BAT), AR1 → AR2 (AR). Two buys = two trades consumed.
     await db.query("BEGIN");
-    await buy(db, BAT2, R2, 9_000);
-    await buy(db, WK1, R2, 9_000);
+    await sell(db, BAT2, R2, 9_000);
+    await buy(db, BATE, R2, 9_000);
+    await sell(db, AR1, R2, 9_000);
+    await buy(db, AR2, R2, 9_000);
     await expect(db.query("COMMIT")).resolves.toBeDefined(); // 2 <= tradesPerRound
   });
 
   it("trades over the limit (3 buys in a non-founding round) are rejected /trades/", async () => {
     const db = await makeTestDb();
     await seedSeason(db, buildRaw());
-    await buy(db, BAT1, R1, 9_000); // founding R1
+    await foundSquad(db); // founding R1
+    // THREE pairs — the squad stays legal (BAT2→BATE, AR1→AR2, BWL2→BWLE), so the
+    // composition guard has nothing to say and the TRADE-COUNT guard is
+    // unambiguously the one refusing. The /trades/ regex proves which spoke.
     await db.query("BEGIN");
-    await buy(db, BAT2, R2, 9_000);
-    await buy(db, WK1, R2, 9_000);
-    await buy(db, BWL1, R2, 9_000);
+    await sell(db, BAT2, R2, 9_000);
+    await buy(db, BATE, R2, 9_000);
+    await sell(db, AR1, R2, 9_000);
+    await buy(db, AR2, R2, 9_000);
+    await sell(db, BWL2, R2, 9_000);
+    await buy(db, BWLE, R2, 9_000);
     await expect(db.query("COMMIT")).rejects.toThrow(/trades/); // 3 > tradesPerRound
   });
 
@@ -193,10 +235,14 @@ describe("G15 — trade limits and salary cap, at commit", () => {
     await expect(buy(db, BAT1, R1, 1_100_000)).rejects.toThrow(/cap/); // > cap 1,000,000
   });
 
-  it("a buy within the cap commits", async () => {
+  it("a founding build within the cap commits", async () => {
     const db = await makeTestDb();
     await seedSeason(db, buildRaw());
-    await expect(buy(db, BAT1, R1, 900_000)).resolves.toBeDefined(); // <= cap 1,000,000
+    // One $900,000 star plus five at $9,000 = $945,000, inside the $1,000,000 cap.
+    await db.query("BEGIN");
+    await buy(db, BAT1, R1, 900_000);
+    for (const pid of FOUNDING.filter((p) => p !== BAT1)) await buy(db, pid, R1, 9_000);
+    await expect(db.query("COMMIT")).resolves.toBeDefined();
   });
 });
 
@@ -242,5 +288,59 @@ describe("G15 — partial-config guard (fails loudly at validation time)", () =>
         [trdId(), PFT, PPLAYER, PROUND],
       ),
     ).rejects.toThrow(/config missing/);
+  });
+});
+
+/**
+ * THE TIGHTENING D26 BROUGHT WITH IT — stated, so it is a property rather than a
+ * side effect somebody discovers later.
+ *
+ * Before migration 0010, selections were written by the client, so a trade that
+ * left a team holding five or seven players committed happily and the illegal
+ * squad surfaced only when somebody opened /team — or not at all, and then
+ * silently at lock. Now holdings ARE the selection set (D26a), so composition is
+ * judged on every write that touches the ledger, at the moment the participant
+ * makes it. A12 named this the decisive argument for the eager design.
+ */
+describe("G15 — composition is now judged at TRADE time (D26 / migration 0010)", () => {
+  it("refuses a lone buy that would leave a one-player team", async () => {
+    const db = await makeTestDb();
+    await seedSeason(db, buildRaw());
+    await expect(buy(db, BAT1, R1, 9_000)).rejects.toThrow(/team size/);
+  });
+
+  it("refuses a buy that would take a complete squad to seven", async () => {
+    const db = await makeTestDb();
+    await seedSeason(db, buildRaw());
+    await foundSquad(db);
+    await expect(buy(db, BATE, R2, 9_000)).rejects.toThrow(/team size/);
+  });
+
+  it("refuses a lone sell that would leave five", async () => {
+    const db = await makeTestDb();
+    await seedSeason(db, buildRaw());
+    await foundSquad(db);
+    await expect(sell(db, BAT2, R2, 9_000)).rejects.toThrow(/team size/);
+  });
+
+  it("accepts the paired sell+buy the trade UI actually writes", async () => {
+    const db = await makeTestDb();
+    await seedSeason(db, buildRaw());
+    await foundSquad(db);
+    await db.query("BEGIN");
+    await sell(db, BAT2, R2, 9_000);
+    await buy(db, BATE, R2, 9_000);
+    await expect(db.query("COMMIT")).resolves.toBeDefined();
+  });
+
+  it("refuses a PAIR that breaks a role minimum, even though the size is right", async () => {
+    const db = await makeTestDb();
+    await seedSeason(db, buildRaw());
+    await foundSquad(db);
+    // Selling the only WK for a second AR keeps the size at 6 and breaks WK ≥ 1.
+    await db.query("BEGIN");
+    await sell(db, WK1, R2, 9_000);
+    await buy(db, AR2, R2, 9_000);
+    await expect(db.query("COMMIT")).rejects.toThrow(/WK minimum/);
   });
 });
