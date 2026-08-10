@@ -10,13 +10,27 @@ import type { LeagueConfig } from "./types.js";
  *   scoring: run 1, four +1, six +2, wicket 25, catch 8 (keeper 8),
  *   stumping 10, runout 10/5, SR bonus +10 if SR ≥ 150 over ≥ 10 balls,
  *   economy bonus +10 if econ ≤ 3.0 over ≥ 3 overs.
+ *
+ * THE O4 KEYS ADDED BY THE ENGINE SLICE ARE NEUTRAL HERE, DELIBERATELY. The DoD
+ * fixture config is FROZEN (Law 3) and names no milestone, duck, not-out, maiden,
+ * 5WI or continuous-economy value, so each of those is 0 and the second-innings
+ * multiplier is 1.0. That is not a placeholder: it is what makes G1's two
+ * hand-scored reference scorecards arithmetically INCAPABLE of moving across the
+ * reshape — every frozen number is multiplied by 1 or added to 0. The season
+ * values (O4) live in seasons.config and are chosen at lock, never here.
  */
 export const FIXTURE_CONFIG: LeagueConfig = {
   scoring: {
     perRun: 1,
     perFour: 1,
     perSix: 2,
+    perFifty: 0,
+    perCentury: 0,
+    perDuck: 0,
+    perNotOut: 0,
     perWicket: 25,
+    perMaiden: 0,
+    perFiveWicketHaul: 0,
     perCatch: 8,
     perKeeperCatch: 8,
     perStumping: 10,
@@ -28,6 +42,8 @@ export const FIXTURE_CONFIG: LeagueConfig = {
     econBonusPoints: 10,
     econBonusMaxEconomy: 3.0,
     econBonusMinOvers: 3,
+    econBonusPerNetBall: 0,
+    secondInningsMultiplier: 1.0,
   },
   pricing: {
     alpha: 0.2,

@@ -137,19 +137,26 @@ function emitRaw(raw: RawSeason): string {
   );
   out.push(
     insert(
+      // Every 0006 column stated explicitly rather than left to its DEFAULT —
+      // see the note in generate-seed.ts: a seed that leans on defaults is a seed
+      // that can drift from the scenario object without any test noticing (C11).
       "batting_lines",
-      ["scorecard_id", "player_id", "runs", "balls_faced", "fours", "sixes"],
+      ["scorecard_id", "innings", "player_id", "runs", "balls_faced", "fours", "sixes", "not_out"],
       raw.scorecards.flatMap((sc) =>
-        sc.batting.map((b) => [sc.id, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes]),
+        sc.batting.map((b) => [
+          sc.id, b.innings, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes, b.notOut,
+        ]),
       ),
     ),
   );
   out.push(
     insert(
       "bowling_lines",
-      ["scorecard_id", "player_id", "overs", "runs_conceded", "wickets"],
+      ["scorecard_id", "innings", "player_id", "overs", "runs_conceded", "wickets", "maidens"],
       raw.scorecards.flatMap((sc) =>
-        sc.bowling.map((b) => [sc.id, b.playerId, b.overs, b.runsConceded, b.wickets]),
+        sc.bowling.map((b) => [
+          sc.id, b.innings, b.playerId, b.overs, b.runsConceded, b.wickets, b.maidens,
+        ]),
       ),
     ),
   );
@@ -159,8 +166,17 @@ function emitRaw(raw: RawSeason): string {
       // `resolved_text` per 0006 (the column formerly called `raw_text`), matching
       // the demo generator. The dev seed has no separate operator source string,
       // so `source_text` is left NULL rather than duplicating the canonical form.
-      ["scorecard_id", "seq", "resolved_text"],
-      raw.scorecards.flatMap((sc) => sc.dismissals.map((d, i) => [sc.id, i, d])),
+      // `seq` restarts within each innings, per 0006's (scorecard_id, innings,
+      // seq) primary key.
+      ["scorecard_id", "innings", "seq", "resolved_text"],
+      raw.scorecards.flatMap((sc) =>
+        sc.dismissals.map((d, i) => [
+          sc.id,
+          d.innings,
+          sc.dismissals.slice(0, i).filter((e) => e.innings === d.innings).length,
+          d.text,
+        ]),
+      ),
     ),
   );
   out.push(
@@ -220,9 +236,10 @@ function emitDerived(d: DerivedState): string {
   out.push(
     insert(
       "player_match_scores",
-      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "base"],
+      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "second_innings_adjustment", "base"],
       d.playerMatchScores.map((s) => [
-        s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.base,
+        s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses,
+        s.secondInningsAdjustment, s.base,
       ]),
     ),
   );

@@ -47,6 +47,14 @@ export interface ConfigField {
   /** Shown under the input — what the parameter MEANS, never what it is set to. */
   hint?: string;
   /**
+   * True for parameters where a NEGATIVE value is legitimate. O4 scores a duck
+   * at −5, and the config carries the operator's own number rather than a
+   * positive "penalty" the engine then subtracts — so the settings page shows
+   * −5 and the pre-flight check must not refuse it. Everything else stays
+   * non-negative, which is why this is opt-in per field.
+   */
+  signed?: boolean;
+  /**
    * True for values the SEASON LOCK computes rather than the operator typing
    * (O3's cap). Rendered read-only, with the preview's figure beside it.
    */
@@ -60,7 +68,13 @@ const SCORING_FIELDS: ConfigField[] = [
   { path: ["scoring", "perRun"], label: "Per run", decision: "O4", kind: "points" },
   { path: ["scoring", "perFour"], label: "Per four", decision: "O4", kind: "points", hint: "on top of the runs" },
   { path: ["scoring", "perSix"], label: "Per six", decision: "O4", kind: "points", hint: "on top of the runs" },
+  { path: ["scoring", "perFifty"], label: "Fifty bonus", decision: "O4", kind: "points", hint: "per innings; REPLACED by the century bonus rather than added to it" },
+  { path: ["scoring", "perCentury"], label: "Century bonus", decision: "O4", kind: "points", hint: "per innings; scored INSTEAD of the fifty bonus, not on top of it" },
+  { path: ["scoring", "perDuck"], label: "Duck", decision: "O4", kind: "points", signed: true, hint: "dismissed for 0 — an unbeaten 0 is not a duck. Negative is expected here" },
+  { path: ["scoring", "perNotOut"], label: "Not out", decision: "O4", kind: "points", hint: "per unbeaten innings" },
   { path: ["scoring", "perWicket"], label: "Per wicket", decision: "O4", kind: "points" },
+  { path: ["scoring", "perMaiden"], label: "Per maiden", decision: "O4", kind: "points" },
+  { path: ["scoring", "perFiveWicketHaul"], label: "Five-wicket haul", decision: "O4", kind: "points", hint: "five wickets in an INNINGS" },
   { path: ["scoring", "perCatch"], label: "Outfield catch", decision: "O4", kind: "points" },
   { path: ["scoring", "perKeeperCatch"], label: "Keeper catch", decision: "O4", kind: "points" },
   { path: ["scoring", "perStumping"], label: "Stumping", decision: "O4", kind: "points" },
@@ -72,6 +86,20 @@ const SCORING_FIELDS: ConfigField[] = [
   { path: ["scoring", "econBonusPoints"], label: "Economy bonus", decision: "O5", kind: "points" },
   { path: ["scoring", "econBonusMaxEconomy"], label: "Economy bonus threshold", decision: "O5", kind: "ratio" },
   { path: ["scoring", "econBonusMinOvers"], label: "Economy bonus min overs", decision: "O5", kind: "count" },
+  {
+    path: ["scoring", "econBonusPerNetBall"],
+    label: "Economy bonus per net ball",
+    decision: "O4",
+    kind: "ratio",
+    hint: "floor(max(0, this × (balls bowled − runs conceded))) per innings — no minimum overs, no penalty above 6/over",
+  },
+  {
+    path: ["scoring", "secondInningsMultiplier"],
+    label: "Second-innings multiplier",
+    decision: "D28/O4",
+    kind: "rate",
+    hint: "what a player's SECOND-innings earnings are worth. One multiplication and one rounding per player per match, before captain doubling. 1.0 = no effect",
+  },
 ];
 
 const PRICING_FIELDS: ConfigField[] = [
@@ -221,7 +249,7 @@ export function validateConfig(config: LeagueConfig): ConfigProblem[] {
       problems.push({ path: key, message: `${field.label} must be a number` });
       continue;
     }
-    if (value < 0) {
+    if (value < 0 && !field.signed) {
       problems.push({ path: key, message: `${field.label} cannot be negative` });
       continue;
     }

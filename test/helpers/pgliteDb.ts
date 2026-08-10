@@ -194,28 +194,36 @@ async function seedSeasonInner(db: DbClient, raw: RawSeason): Promise<void> {
         [s.id, pid],
       );
     }
+    // EVERY 0006 COLUMN IS WRITTEN, none left to its DEFAULT. A RawScorecard now
+    // carries innings, not_out and maidens (D28c), and a helper that dropped them
+    // would hand the engine a different scorecard from the one the fixture
+    // describes — silently, since the defaults are all valid values.
     for (const b of s.batting) {
       await db.query(
-        `INSERT INTO batting_lines (scorecard_id, player_id, runs, balls_faced, fours, sixes)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [s.id, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes],
+        `INSERT INTO batting_lines (scorecard_id, innings, player_id, runs, balls_faced, fours, sixes, not_out)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [s.id, b.innings, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes, b.notOut],
       );
     }
     for (const b of s.bowling) {
       await db.query(
-        `INSERT INTO bowling_lines (scorecard_id, player_id, overs, runs_conceded, wickets)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [s.id, b.playerId, b.overs, b.runsConceded, b.wickets],
+        `INSERT INTO bowling_lines (scorecard_id, innings, player_id, overs, runs_conceded, wickets, maidens)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [s.id, b.innings, b.playerId, b.overs, b.runsConceded, b.wickets, b.maidens],
       );
     }
     // `resolved_text` (0006): the canonical, engine-facing form with player ids in
     // the fielder positions. RawScorecard.dismissals carries exactly that; the
     // operator's source string (source_text) is entry-time audit material and has
-    // no place in a recompute fixture.
-    for (let i = 0; i < s.dismissals.length; i++) {
+    // no place in a recompute fixture. `seq` restarts per innings, per 0006's
+    // (scorecard_id, innings, seq) primary key.
+    const seqByInnings = new Map<number, number>();
+    for (const d of s.dismissals) {
+      const seq = seqByInnings.get(d.innings) ?? 0;
+      seqByInnings.set(d.innings, seq + 1);
       await db.query(
-        "INSERT INTO dismissals (scorecard_id, seq, resolved_text) VALUES ($1,$2,$3)",
-        [s.id, i, s.dismissals[i]],
+        "INSERT INTO dismissals (scorecard_id, innings, seq, resolved_text) VALUES ($1,$2,$3,$4)",
+        [s.id, d.innings, seq, d.text],
       );
     }
   }

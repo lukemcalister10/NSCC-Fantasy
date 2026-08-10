@@ -30,7 +30,14 @@ const roundIdByMatch = new Map([[M1, R1]]);
 
 /** A per-player score row (only `base` and presence matter for captaincy). */
 function score(playerId: string, base: number): DerivedPlayerMatchScore {
-  return { matchId: M1, playerId, played: true, batting: base, bowling: 0, fielding: 0, bonuses: 0, base };
+  return {
+    matchId: M1, playerId, played: true, batting: base, bowling: 0, fielding: 0, bonuses: 0,
+    // One-innings row: the D28 multiplier has nothing to act on, so its term is 0
+    // and `base` still equals its components. G8 is about captaincy, which lands
+    // on `base` AFTER any multiplier — this row is the "no multiplier" case.
+    secondInningsAdjustment: 0,
+    base,
+  };
 }
 
 const selections: RawSelection[] = [

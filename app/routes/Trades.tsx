@@ -3,8 +3,6 @@ import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
 import {
   executeTradePair,
-  resolveCaptaincy,
-  syncSelectionsToHoldings,
   translateRefusal,
   type Refusal,
 } from "../lib/teamMutations";
@@ -153,26 +151,15 @@ export function Trades() {
         buy: { playerId: buy.id, price: buyPrice },
       });
 
-      // 2. SELECTIONS, materialised from the new holdings for every open round.
-      //    Captaincy carries forward; if the captain was just sold, resolveCaptaincy
-      //    promotes so the mandatory-captain invariant (Rider 1) still holds.
-      const captaincy = resolveCaptaincy({
-        holdings: afterHoldings,
-        thisRound: state.selections.filter((s) => s.round_id === roundId),
-        priorRound: state.priorSelections,
-        priceOf: state.priceOf,
-      });
-      if (captaincy) {
-        for (const round of state.openRounds) {
-          await syncSelectionsToHoldings({
-            teamId: state.team.id,
-            roundId: round.id,
-            holdings: afterHoldings,
-            existing: state.selections.filter((s) => s.round_id === round.id),
-            captaincy,
-          });
-        }
-      }
+      // 2. SELECTIONS — NOTHING TO DO HERE ANY MORE (D26 / migration 0010).
+      //    The trades insert above fires app.materialise_selections inside its OWN
+      //    transaction, for every open round of this team, carrying captaincy
+      //    forward exactly as resolveCaptaincy would (and promoting if the captain
+      //    was the player just sold, so Rider 1 still holds). This screen used to
+      //    do it in a second request; keeping that would mean two writers of the
+      //    same rows, which D26 rules out — and it is what tripped C7's duplicate
+      //    key. It also means the ledger write and the materialisation are now
+      //    atomic together, which no client round-trip could guarantee (F2/F3).
 
       setSellId(null);
       setBuyId(null);

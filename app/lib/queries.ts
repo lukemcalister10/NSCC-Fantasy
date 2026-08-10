@@ -72,6 +72,9 @@ export interface PlayerScoreRow {
   bowling: number;
   fielding: number;
   bonuses: number;
+  /** D28's second-innings multiplier, as one term. 0 unless the season sets a
+   *  multiplier below 1 AND the player earned points in a second innings. */
+  second_innings_adjustment: number;
   base: number;
   matches: {
     grade: string;
@@ -303,7 +306,11 @@ export function usePlayer(playerId: string | undefined) {
         await supabase
           .from("player_match_scores")
           .select(
-            "match_id,played,batting,bowling,fielding,bonuses,base,matches(grade,opponent,status,final_day_date,rounds(name,seq))",
+            // second_innings_adjustment is selected so the breakdown ADDS UP:
+            // bat + bowl + field + bonus + this = pts, exactly (D28/0009).
+            // Without it the row would silently fail to reconcile the moment the
+            // season runs a multiplier below 1.
+            "match_id,played,batting,bowling,fielding,bonuses,second_innings_adjustment,base,matches(grade,opponent,status,final_day_date,rounds(name,seq))",
           )
           .eq("player_id", playerId!),
       );

@@ -13,15 +13,37 @@ import type { DerivedH2hResult, DerivedTeamRoundScore } from "./types.js";
  * is the true middle element, an integer. The bye team then wins/loses/ties
  * against that median exactly like a normal fixture.
  *
- * Gate: G9 (5-team H2H round, bye vs median, reconciled by hand).
+ * THE FIXTURE INDEX IS A PROPERTY OF THE ROUND (D29). It is `seq − 1` — the
+ * round's own number — and NEVER the round's position among ACTIVE rounds, which
+ * is what this function used to receive. The difference is not cosmetic: under
+ * the positional rule an empty round that later acquires its first match shifts
+ * every later round's index by one and retroactively rewrites who played whom in
+ * rounds already settled. D19 makes it reachable (a round with no entered matches
+ * does not exist for H2H), and the operator has explicitly ruled out results
+ * changing with hindsight (D24, same principle, different door). With seq − 1 a
+ * round's fixture is knowable before it is played, publishable in advance, and
+ * immune to what happens in any other round — which is what D21's determinism
+ * means. It also agrees with app/lib/queries.ts, which always used seq − 1, and
+ * with generateRound's own contract ("roundIndex is 0-based (round seq − 1)").
+ *
+ * Gate: G9 (5-team H2H round, bye vs median, reconciled by hand). G9's single
+ * round is seq 1 → index 0, unchanged either way, so the gate stays green
+ * BYTE-IDENTICALLY across this change.
  */
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
+/** An active round, carrying its own sequence number (D29). */
+export interface H2hRound {
+  id: string;
+  /** The round's number in the season, 1-based. Fixture index is seq − 1. */
+  seq: number;
+}
+
 export interface H2hInput {
   teamIds: string[];
-  /** Active round ids in ascending seq order (drives the round-robin index). */
-  activeRoundIdsBySeq: string[];
+  /** Active rounds in ascending seq order, each carrying its own seq (D29). */
+  activeRounds: H2hRound[];
   teamRoundScores: DerivedTeamRoundScore[];
 }
 
@@ -37,7 +59,7 @@ function roundMedian(totals: number[]): number {
 }
 
 export function computeH2hResults(input: H2hInput): DerivedH2hResult[] {
-  const { teamIds, activeRoundIdsBySeq, teamRoundScores } = input;
+  const { teamIds, activeRounds, teamRoundScores } = input;
 
   // (roundId,teamId) → total.
   const totalByTeamRound = new Map<string, number>();
@@ -48,8 +70,9 @@ export function computeH2hResults(input: H2hInput): DerivedH2hResult[] {
     totalByTeamRound.get(roundId + "|" + teamId) ?? 0;
 
   const out: DerivedH2hResult[] = [];
-  activeRoundIdsBySeq.forEach((roundId, index) => {
-    const fixtures = generateRound(teamIds, index);
+  for (const { id: roundId, seq } of activeRounds) {
+    // D29: the round's own number decides its fixture, not its position here.
+    const fixtures = generateRound(teamIds, seq - 1);
     const medianThisRound = roundMedian(
       teamIds.map((t) => totalOf(roundId, t)),
     );
@@ -87,7 +110,7 @@ export function computeH2hResults(input: H2hInput): DerivedH2hResult[] {
         });
       }
     }
-  });
+  }
 
   // Deterministic emit order = the columns readDerived orders by.
   return out.sort(

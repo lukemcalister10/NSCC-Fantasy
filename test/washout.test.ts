@@ -33,8 +33,8 @@ describe("WASHOUT — an abandoned match yields no scores and no price movement"
       {
         id: "sc-w1", matchId: M1, wicketKeeperPlayerId: null, reviewState: "committed",
         lineup: ["pa", "pb"],
-        batting: [{ playerId: "pa", runs: 80, ballsFaced: 40, fours: 8, sixes: 2 }],
-        bowling: [{ playerId: "pb", overs: 4, runsConceded: 10, wickets: 3 }],
+        batting: [{ playerId: "pa", innings: 1, runs: 80, ballsFaced: 40, fours: 8, sixes: 2, notOut: false }],
+        bowling: [{ playerId: "pb", innings: 1, overs: 4, runsConceded: 10, wickets: 3, maidens: 0 }],
         dismissals: [],
       },
     ],

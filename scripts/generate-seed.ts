@@ -142,15 +142,19 @@ function buildRaw(): RawSeason {
         wicketKeeperPlayerId: pid(5), // p05 keeps → catches count as keeper catches
         reviewState: "committed",
         lineup,
+        // ONE INNINGS (D27), so every line is innings 1. not_out and maidens are
+        // stated rather than defaulted — the raw contract requires them because
+        // the columns are NOT NULL, and the demo season's figures are unchanged
+        // by them under the fixture config, which scores neither.
         batting: [
-          { playerId: pid(1), runs: 72, ballsFaced: 58, fours: 9, sixes: 1 },
-          { playerId: pid(2), runs: 34, ballsFaced: 16, fours: 4, sixes: 1 }, // SR 212 → SR bonus
-          { playerId: pid(3), runs: 5, ballsFaced: 12, fours: 0, sixes: 0 },
-          { playerId: pid(5), runs: 18, ballsFaced: 20, fours: 2, sixes: 0 },
+          { playerId: pid(1), innings: 1, runs: 72, ballsFaced: 58, fours: 9, sixes: 1, notOut: false },
+          { playerId: pid(2), innings: 1, runs: 34, ballsFaced: 16, fours: 4, sixes: 1, notOut: false }, // SR 212 → SR bonus
+          { playerId: pid(3), innings: 1, runs: 5, ballsFaced: 12, fours: 0, sixes: 0, notOut: false },
+          { playerId: pid(5), innings: 1, runs: 18, ballsFaced: 20, fours: 2, sixes: 0, notOut: true },
         ],
         bowling: [
-          { playerId: pid(7), overs: 6, runsConceded: 14, wickets: 3 }, // econ 2.33 → econ bonus
-          { playerId: pid(8), overs: 5, runsConceded: 33, wickets: 1 },
+          { playerId: pid(7), innings: 1, overs: 6, runsConceded: 14, wickets: 3, maidens: 2 }, // econ 2.33 → econ bonus
+          { playerId: pid(8), innings: 1, overs: 5, runsConceded: 33, wickets: 1, maidens: 0 },
         ],
         // CANONICAL (engine-facing) dismissal strings — fielder positions hold
         // player IDS, not registry keys. scoreMatch credits a fielder only when
@@ -162,10 +166,10 @@ function buildRaw(): RawSeason {
         // dismissals.resolved_text (0006), with the operator's typed string kept
         // separately in source_text.
         dismissals: [
-          `c ${pid(10)} b ${pid(8)}`, // p10 outfield catch
-          `c ${pid(5)} b ${pid(7)}`, // p05 keeper catch (p05 keeps)
-          `st ${pid(5)} b ${pid(7)}`, // p05 stumping
-          `run out (${pid(10)})`, // p10 unassisted run out
+          { innings: 1, text: `c ${pid(10)} b ${pid(8)}` }, // p10 outfield catch
+          { innings: 1, text: `c ${pid(5)} b ${pid(7)}` }, // p05 keeper catch (p05 keeps)
+          { innings: 1, text: `st ${pid(5)} b ${pid(7)}` }, // p05 stumping
+          { innings: 1, text: `run out (${pid(10)})` }, // p10 unassisted run out
         ],
       },
     ],
@@ -306,16 +310,26 @@ function emitRaw(raw: RawSeason): string {
   );
   out.push(
     insert(
+      // EVERY 0006 COLUMN IS WRITTEN EXPLICITLY, not left to its DEFAULT. The
+      // emitted file is what the operator pastes, so it has to describe the
+      // scorecard completely — innings (D27), not_out and maidens (O4 capture).
+      // Relying on defaults is how the emitted artifact and the scenario object
+      // drift apart while every test that routes through the object stays green,
+      // which is precisely C11.
       "batting_lines",
-      ["scorecard_id", "player_id", "runs", "balls_faced", "fours", "sixes"],
-      sc.batting.map((b) => [sc.id, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes]),
+      ["scorecard_id", "innings", "player_id", "runs", "balls_faced", "fours", "sixes", "not_out"],
+      sc.batting.map((b) => [
+        sc.id, b.innings, b.playerId, b.runs, b.ballsFaced, b.fours, b.sixes, b.notOut,
+      ]),
     ),
   );
   out.push(
     insert(
       "bowling_lines",
-      ["scorecard_id", "player_id", "overs", "runs_conceded", "wickets"],
-      sc.bowling.map((b) => [sc.id, b.playerId, b.overs, b.runsConceded, b.wickets]),
+      ["scorecard_id", "innings", "player_id", "overs", "runs_conceded", "wickets", "maidens"],
+      sc.bowling.map((b) => [
+        sc.id, b.innings, b.playerId, b.overs, b.runsConceded, b.wickets, b.maidens,
+      ]),
     ),
   );
   out.push(
@@ -324,8 +338,15 @@ function emitRaw(raw: RawSeason): string {
       // `resolved_text` per 0006 (the column formerly, and misleadingly, called
       // `raw_text`). The demo seed has no separate operator source string, so
       // `source_text` is left NULL rather than duplicating the canonical form.
-      ["scorecard_id", "seq", "resolved_text"],
-      sc.dismissals.map((d, i) => [sc.id, i, d]),
+      // `seq` restarts within each innings, matching the (scorecard_id, innings,
+      // seq) primary key 0006 installed.
+      ["scorecard_id", "innings", "seq", "resolved_text"],
+      sc.dismissals.map((d, i) => [
+        sc.id,
+        d.innings,
+        sc.dismissals.slice(0, i).filter((e) => e.innings === d.innings).length,
+        d.text,
+      ]),
     ),
   );
   out.push(
@@ -371,8 +392,8 @@ function emitDerived(d: DerivedState): string {
   out.push(
     insert(
       "player_match_scores",
-      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "base"],
-      d.playerMatchScores.map((s) => [s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.base]),
+      ["match_id", "player_id", "played", "batting", "bowling", "fielding", "bonuses", "second_innings_adjustment", "base"],
+      d.playerMatchScores.map((s) => [s.matchId, s.playerId, s.played, s.batting, s.bowling, s.fielding, s.bonuses, s.secondInningsAdjustment, s.base]),
     ),
   );
   out.push(
