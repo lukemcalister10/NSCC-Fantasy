@@ -9,6 +9,8 @@ import {
   importPlayers,
   explainWriteError,
 } from "../../lib/adminMutations";
+import { removePlayerFromPool, explainLockError } from "../../lib/seasonLockMutations";
+import { isPoolRemovalAllowed } from "../../lib/seasonLock";
 import { Loading, ErrorState, EmptyState } from "../../components/states";
 import { RoleBadge } from "../../components/RoleBadge";
 import { money, shortDate } from "../../lib/format";
@@ -245,6 +247,7 @@ function AddPlayerForm({
 
 function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean }) {
   const qc = useQueryClient();
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [draft, setDraft] = useState({
     displayName: player.display_name,
     role: player.role,
@@ -275,6 +278,23 @@ function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean })
             }),
         active: draft.active,
       }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
+  });
+
+  /**
+   * REMOVE FROM THE POOL (operator ruling, 10/08/2026). O3's cap is the mean over
+   * ALL players in the pool, taken literally, so a registrant who withdrew must
+   * LEAVE the pool before lock rather than have the cap arithmetic qualified
+   * around them. `active = false` is not that: it means "not selectable", and an
+   * inactive player still counts in the mean.
+   *
+   * 0008 refuses this for anyone carrying raw history — a lineup, a batting or
+   * bowling line, a dismissal credit (D25, which no foreign key protects), a
+   * selection or a trade — and for any locked season, naming which one blocks it.
+   * Nothing is re-checked here; the button asks and reports the answer.
+   */
+  const remove = useMutation({
+    mutationFn: () => removePlayerFromPool(player.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 
@@ -339,8 +359,37 @@ function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean })
         >
           {save.isPending ? "Saving…" : "Save"}
         </button>
+        {isPoolRemovalAllowed(locked ? "locked" : null) ? (
+          confirmRemove ? (
+            <>
+              <button
+                className="btn-ghost btn-danger"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate()}
+              >
+                {remove.isPending ? "Removing…" : "Remove permanently"}
+              </button>
+              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="btn-ghost btn-danger" onClick={() => setConfirmRemove(true)}>
+              Remove…
+            </button>
+          )
+        ) : null}
+        {confirmRemove && !remove.error ? (
+          <div className="admin-status admin-status-error">
+            Removes {player.display_name} from the pool the salary cap is computed from. Only
+            possible before lock, and only for a player with no history.
+          </div>
+        ) : null}
         {save.error ? (
           <div className="admin-status admin-status-error">{explainWriteError(save.error)}</div>
+        ) : null}
+        {remove.error ? (
+          <div className="admin-status admin-status-error">{explainLockError(remove.error)}</div>
         ) : null}
       </td>
     </tr>

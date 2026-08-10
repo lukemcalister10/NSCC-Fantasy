@@ -176,4 +176,192 @@ console, and hand it back to the build seat.
   report's handoff section.
 - **LLM transcription (G12)** — slice S-B. It inherits the seam this slice settled: a dismissal's
   canonical form holds player ids resolved at entry, and `source_text` keeps the raw string.
-- **Settings / season lock UI** — `/admin/settings` is still the shared-chrome stub.
+- ~~**Settings / season lock UI**~~ — built by slice S-D; see the section below.
+
+---
+
+# SEASON LOCK (S-D) — apply + verify
+
+State-stamp: as-of 10/08/2026 · slice **S-D season lock** · builds against KICKOFF v1.3 /
+DEFINITION_OF_DONE v1.2 (frozen) / DECISION_LOG **v2.0** · continues from `main @ eca2109`.
+
+**This section closes step 9 above, which has been BLOCKED rather than failed.** Step 9 said
+*"if the season is locked…"* because until now nothing could lock it: the enforcement existed
+(migration `0002`, verified) but `/admin/settings` was a stub, so the only way to fire the lock
+was `UPDATE seasons SET locked_at = now()` in the SQL editor — with no way to see beforehand
+what salary cap that would compute. Steps S1–S9 below are the operator half of gate **G10**.
+
+## Step S0 — apply migration 0008
+
+| # | File | What it does |
+|---|---|---|
+| 1 | `supabase/migrations/0008_season_lock_action.sql` | the rehearsal-preview function; rebinds `enforce_season_lock()` so preview and lock share one arithmetic; legible refusals; the pre-lock pool-removal mechanism and its audit entry |
+
+**Expect:** success, no error. It is append-only — `0002` is not edited, and the existing
+`trg_seasons_lock` picks up the new function body by name (the same technique `0004` used).
+
+Nothing about the economy changes on apply. The cap arithmetic is identical; the `$100`
+rounding step simply moves from a literal in `0002` to `pricing.roundingIncrement` in your
+config, which for every config in this repo IS `$100`.
+
+## Step S1 — the settings page exists and is linked
+
+Sign in as a league manager, open **/admin**. **Expect:** a **Settings & season lock** button
+beside Player registry / Rounds / Scorecards. Follow it to **/admin/settings**.
+
+**Expect:** four panels — Economy parameters, The pool the cap is computed from, Rehearsal, and
+Fire the season lock — and a banner saying the season is not locked.
+
+## Step S2 — every economy parameter is editable, and the edit propagates
+
+> **Do S2 on a scratch season, not on the one you intend to run.** It changes scoring values.
+
+In **Economy parameters**, change **Per run** from its current value to double it. Press
+**Save settings**. **Expect:** "Saved. The next recompute uses these values."
+
+Now open **/admin**, press **Recompute season**, and open a player page for someone who scored
+runs in an entered round. **Expect:** their batting points have doubled. Change **Per run**
+back, save, recompute again. **Expect:** the original figures return exactly (that is D15/G3
+doing its job as much as D13).
+
+**Expect also:** the **Salary cap** field is the only one you cannot type into. It reads
+"the lock will compute $X" — the cap is computed BY the lock action, never entered (O3).
+
+Try setting a role minimum higher than the team size. **Expect:** the page names the problem
+("role minimums total N, which does not fit inside a team of M") and **Save** is disabled. That
+is a courtesy check; the database has its own (0003).
+
+## Step S3 — unpriced players block the lock, by name (C13)
+
+The live scratch season showed *65 players, 1 awaiting a price*. **The pool panel now names
+that player.**
+
+**Expect:** an amber panel — "N players awaiting a price — the lock is blocked" — listing each
+one, with a link to the registry. In the **Fire** panel, the season-name box is disabled and the
+lock button is unavailable, with the same sentence repeated.
+
+Price the named player in **/admin/players**, return to settings. **Expect:** the panel turns to
+"Every player in the pool has a starting price", and the fire panel arms.
+
+## Step S4 — remove withdrawn registrants before you lock
+
+The cap is the mean starting price across **all** players in the pool, taken literally (O3), so
+a registrant who withdrew but still sits in the registry at the floor drags your cap down. The
+answer is to remove them, not to qualify what O3 means.
+
+In the pool panel, any **inactive** player is listed with **Remove from pool…**; the same
+control is on each row of **/admin/players**. Remove one, confirm.
+
+**Expect:** the player disappears, the rehearsal panel's pool size drops by one, and the **mean
+and the computed cap both move**. Check `SELECT * FROM player_registry_events WHERE event =
+'delete';` — the removal is logged with the player's name, role and price.
+
+Now try removing a player who has played. **Expect:** refusal naming what blocks it — "named in
+a match lineup", "has a batting line", "is credited in a dismissal string (D25)", "appears in a
+fantasy team's trade ledger". Removal is only for registrants with no history; for anyone else,
+`active = false` is the tool, and they stay in the cap mean.
+
+> `active = false` means **not selectable**, not **not in the pool**. An inactive player still
+> counts toward the cap. The rehearsal panel shows the active/inactive split so you can see
+> whether the removal work is actually done.
+
+## Step S5 — rehearse, and read what you are about to do
+
+The **Rehearsal** panel writes nothing. **Expect** it to show: pool size and priced count; the
+active/inactive split; the mean starting price; how many players sit exactly at the floor; the
+**cap the lock will compute**, with the arithmetic spelled out; and the table of the ten
+categories that freeze, each naming the database trigger that will refuse it.
+
+**Verify the cap by hand.** Take the mean it shows, multiply by team size, round to the nearest
+$100 with halves up. **Expect** the panel's figure exactly. (`SELECT avg(starting_price) FROM
+players WHERE season_id = '…';` gives you the mean independently.)
+
+**Read the pool-completeness warning** (O3/A9). The cap is 1.0× with no headroom, so it is only
+as right as the pool. Newcomers price at the floor and pull the mean — and the cap — **down**;
+a pool weighted toward established performers therefore yields a cap that is too **generous**.
+Indicatively, adding 20 floor-priced players to a 53-player pool moves the cap by ~20%. If
+registrations are still open, enter the expected newcomers as floor-priced registry entries
+**before** locking.
+
+## Step S6 — settings cannot be edited in the same breath as locking
+
+In the SQL editor, as an authenticated manager, try to do both at once:
+
+```sql
+UPDATE seasons SET config = jsonb_set(config, '{squad,teamSize}', '11'), locked_at = now()
+ WHERE id = '…';
+```
+
+**Expect:** refusal — *"the locking statement may not also change config"*. This exists so the
+cap the rehearsal panel showed you is the cap that gets frozen; a config edit riding along in
+the locking statement would compute the cap from a team size no preview ever displayed. Save
+settings first, re-read the rehearsal panel, then lock.
+
+## Step S7 — fire the lock (**on the scratch season first**)
+
+In the **Fire** panel, **Expect** the pool figures and the cap repeated inline, and a box asking
+you to type the season's name. There is no plain "confirm" button: a one-way door should not be
+click-through-able. Type the name, press **Lock … permanently**.
+
+**Expect:** the page turns into a record — locked timestamp, the computed cap, "all 10
+categories are frozen", and a note that there is no unlock control because there is no unlock.
+
+**Verify the cap landed:** `SELECT config #>> '{squad,cap}' FROM seasons WHERE id = '…';`
+**Expect** exactly the figure the rehearsal panel promised in step S5.
+
+## Step S8 — the freeze, per category, on a direct authenticated write
+
+This is the part step 9 could not do. In the SQL editor **as an authenticated manager** (not as
+the service role or the postgres superuser — those bypass RLS and are not what a client is),
+run each of these. **Expect every one to be refused.**
+
+| # | Category | Direct write | Refused by |
+|---|---|---|---|
+| 1 | League settings | `UPDATE seasons SET config = jsonb_set(config,'{squad,teamSize}','9') WHERE id='…';` | `trg_seasons_lock` |
+| 2 | Scoring rules | `UPDATE seasons SET config = jsonb_set(config,'{scoring,perRun}','3') WHERE id='…';` | `trg_seasons_lock` |
+| 3 | Starting prices | `UPDATE players SET starting_price = 1 WHERE id='…';` | `trg_players_lock` |
+| 4 | Roles | `UPDATE players SET role = 'WK' WHERE id='…';` | `trg_players_lock` |
+| 5 | WK eligibility | `UPDATE players SET wk_eligible = true WHERE id='…';` | `trg_players_lock` |
+| 6 | α | `UPDATE seasons SET config = jsonb_set(config,'{pricing,alpha}','0.5') WHERE id='…';` | `trg_seasons_lock` |
+| 7 | Price floor | `UPDATE seasons SET config = jsonb_set(config,'{pricing,floor}','1000') WHERE id='…';` | `trg_seasons_lock` |
+| 8 | $ per point | `UPDATE seasons SET config = jsonb_set(config,'{pricing,dollarsPerPoint}','2000') WHERE id='…';` | `trg_seasons_lock` |
+| 9 | Trades per round | `UPDATE seasons SET config = jsonb_set(config,'{squad,tradesPerRound}','5') WHERE id='…';` | `trg_seasons_lock` |
+| 10 | Team registration (D21) | `INSERT INTO fantasy_teams (season_id, owner_profile_id, name) VALUES ('…','…','X');` and `DELETE FROM fantasy_teams WHERE id='…';` | `trg_fantasy_teams_registration_lock` |
+
+And the door itself:
+
+```sql
+UPDATE seasons SET locked_at = NULL WHERE id = '…';                      -- refused
+UPDATE seasons SET locked_at = now() + interval '1 day' WHERE id = '…';  -- refused
+DELETE FROM players WHERE id = '…';                                      -- refused (pool frozen)
+```
+
+**Expect** each to fail. In the UI, **expect** the corresponding controls to be absent or
+disabled on /admin/settings and /admin/players — but the disabled control is chrome; the
+refusals above are the boundary.
+
+**One thing that must still WORK post-lock:** adding a player mid-season (C4). Add one in
+/admin/players. **Expect** it to succeed at the config floor, and **expect** the cap to be
+unchanged — it was computed over the pool as it stood at lock and is frozen inside the config.
+
+## Step S9 — sign-off
+
+Record in the session report: *season lock verified on `<date>`, deployment `<url>`, as manager
+`<email>`; migration 0008 applied; rehearsed on scratch season `<name>`; cap computed
+`$<amount>` over `<n>` players at a mean of `$<mean>`, hand-checked; all ten categories refused
+on direct authenticated writes.*
+
+**Only after this sign-off does G10 move from enforcement-verified to
+operator-action-verified.** The build seat cannot claim it: the in-repo suite proves the
+enforcement and the preview fidelity, but the gate's remaining half is an operator performing
+the action on a live project, and that artifact is yours.
+
+## What is not in this slice
+
+- **The O4 scoring shape.** The settings page exposes exactly the scoring keys the config
+  carries today (`perRun`, `perFour`, the SR/economy threshold fields, …). O4's draft values —
+  50/100 bonuses, duck, not-out, maiden, 5WI, the continuous economy bonus and
+  `second_innings_multiplier` — need `ScoringConfig` reshaped in `src/config/types.ts` and
+  `src/engines/*`, which is the named engine slice's work under **D28**. Setting those values
+  is a decision for lock day; having a field to type them into is an engine-slice deliverable.
+- **A per-round lock control.** Round lock datetimes live on /admin/rounds and are unchanged.
