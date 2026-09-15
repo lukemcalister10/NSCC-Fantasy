@@ -23,30 +23,66 @@ import {
  * round all come from the row, never from code.
  */
 
+/**
+ * FOR LIST QUERIES ONLY. `?? []` is what lets a caller map over the result
+ * without a null check, and every list-returning hook below depends on it.
+ *
+ * DO NOT PAIR THIS WITH `.maybeSingle()` — that is C16, the registration
+ * blocker. `.maybeSingle()` resolves to `data: null` when no row matches
+ * (verified in @supabase/postgrest-js: PostgrestBuilder collapses a 0-row list
+ * response to `null`), so this helper would convert "no row" into `[]`. An empty
+ * array is NOT nullish, so a caller's `?? null` does not fire and every
+ * downstream truthiness test sees a present-but-empty object. Use
+ * `unwrapMaybe` for single-row reads.
+ */
 function unwrap<T>(res: { data: unknown; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
   return (res.data ?? []) as T;
+}
+
+/**
+ * FOR `.maybeSingle()` READS. Preserves the distinction `unwrap` destroys:
+ * ABSENT (no such row) comes back as `null`, never as an empty collection.
+ *
+ * This is the C16 fix. It is a SECOND helper rather than a change to `unwrap`'s
+ * contract deliberately: `unwrap`'s `?? []` is correct for the ten list queries
+ * in this file, and re-pointing all of them to satisfy one single-row caller
+ * would put every one of those call sites at risk to fix a bug in none of them.
+ */
+function unwrapMaybe<T>(res: { data: unknown; error: { message: string } | null }): T | null {
+  if (res.error) throw new Error(res.error.message);
+  return (res.data ?? null) as T | null;
 }
 
 const STALE = 30_000;
 
 // ── League config (the single source of every limit this slice enforces) ─────
 
+/**
+ * The frozen `seasons.config`, or `null` when there is no such season.
+ *
+ * HARDENED AS PART OF THE C16 AUDIT (item 3). This read used the same
+ * `.maybeSingle()` + `unwrap` pairing that broke `fetchMyTeam`, and survived
+ * only by accident: `unwrap` returned `[]`, `[].config` is `undefined`, and
+ * `undefined ?? null` happens to be `null`. The right answer for the wrong
+ * reason is still a latent defect — it depended on the caller reaching through
+ * the value for a property rather than testing the value itself, so the next
+ * caller to write `if (row)` would have inherited C16 here. Now `null` is
+ * produced by the unwrapping, not by a coincidence downstream of it.
+ */
+export async function fetchLeagueConfig(seasonId: string): Promise<LeagueConfig | null> {
+  const row = unwrapMaybe<{ config: LeagueConfig }>(
+    await supabase.from("seasons").select("config").eq("id", seasonId).maybeSingle(),
+  );
+  return row?.config ?? null;
+}
+
 export function useLeagueConfig(seasonId: string | undefined) {
   return useQuery({
     queryKey: ["league-config", seasonId],
     enabled: !!seasonId,
     staleTime: STALE,
-    queryFn: async (): Promise<LeagueConfig | null> => {
-      const row = unwrap<{ config: LeagueConfig } | null>(
-        await supabase
-          .from("seasons")
-          .select("config")
-          .eq("id", seasonId!)
-          .maybeSingle(),
-      );
-      return row?.config ?? null;
-    },
+    queryFn: (): Promise<LeagueConfig | null> => fetchLeagueConfig(seasonId!),
   });
 }
 
@@ -130,6 +166,53 @@ export interface MyTeam {
   owner_profile_id: string;
 }
 
+/**
+ * "Does this participant have a team in THIS season?" — the data-layer half,
+ * as a plain function so it is callable without React and therefore testable
+ * against a real database (test/c16.registration-path.test.ts).
+ *
+ * Returns `null` for ABSENT — no team for this owner in this season — and never
+ * an empty collection standing in for one. The season filter is part of the
+ * answer, not decoration: a team in ANOTHER season must read as absent here,
+ * which is precisely what the live 15/09 symptom looked like.
+ */
+export async function fetchMyTeam(
+  seasonId: string,
+  userId: string,
+): Promise<MyTeam | null> {
+  return unwrapMaybe<MyTeam>(
+    await supabase
+      .from("fantasy_teams")
+      .select("id,name,owner_profile_id")
+      .eq("season_id", seasonId)
+      .eq("owner_profile_id", userId)
+      .maybeSingle(),
+  );
+}
+
+/**
+ * The HAS-A-TEAM DECISION, as a plain total function over whatever the query
+ * layer produced.
+ *
+ * Why this exists as its own function rather than an inline ternary: the visible
+ * C16 symptom — a squad builder for a team that does not exist, under an EMPTY
+ * `<h1>` — was produced HERE, at the branch, not in the query. Pinning the
+ * branch means a malformed value from any future producer is caught at the point
+ * a participant would see it. It is deliberately defensive rather than a cast: a
+ * row only counts as a team when it actually carries a string id and name, so
+ * `[]`, `{}` and a half-built object all read as "no team" instead of rendering
+ * chrome with `undefined` in it.
+ */
+export function teamIdentity(
+  row: MyTeam | null | undefined,
+): { id: string; name: string } | null {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+  const { id, name } = row;
+  if (typeof id !== "string" || id.length === 0) return null;
+  if (typeof name !== "string") return null;
+  return { id, name };
+}
+
 export function useMyTeam(seasonId: string | undefined) {
   const { session } = useAuth();
   const userId = session?.user?.id;
@@ -137,17 +220,7 @@ export function useMyTeam(seasonId: string | undefined) {
     queryKey: ["my-team", seasonId, userId],
     enabled: !!seasonId && !!userId,
     staleTime: STALE,
-    queryFn: async (): Promise<MyTeam | null> => {
-      const row = unwrap<MyTeam | null>(
-        await supabase
-          .from("fantasy_teams")
-          .select("id,name,owner_profile_id")
-          .eq("season_id", seasonId!)
-          .eq("owner_profile_id", userId!)
-          .maybeSingle(),
-      );
-      return row ?? null;
-    },
+    queryFn: (): Promise<MyTeam | null> => fetchMyTeam(seasonId!, userId!),
   });
 }
 

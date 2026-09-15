@@ -578,6 +578,53 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
      self-corrects via the EMA, but it will alarm participants in week one and
      is the reason to revisit α (O7) before lock if it looks too sharp.
 
+### Opened 15/09/2026 (S-G). NUMBERING NOTE: C14 and C15 are defined in the A14
+### block dated 11/09 and 15/09/2026, which the operator holds and which is NOT
+### yet committed to this file. C16 is numbered to follow them; the gap here is
+### the uncommitted block, not a missing item. S-G did not commit A14 — that is a
+### governance action, not this slice's.
+- C16 CLOSED (S-G, 15/09/2026). REGISTRATION BLOCKER. No participant could
+     register a fantasy team in the 2026/27 season: /team rendered the squad
+     builder for a team that did not exist, under an EMPTY <h1>, while
+     `select * from fantasy_teams where season_id = <2026/27>` returned no rows.
+     CAUSE, verified before fixing rather than taken from the spec (D26's
+     standing lesson): `unwrap()` in app/lib/teamQueries.ts returned
+     `res.data ?? []`, which is correct for its ten list callers. `useMyTeam`
+     paired it with `.maybeSingle()`, which resolves to `data: null` when no row
+     matches — read out of the installed @supabase/postgrest-js, not assumed —
+     so "no team" became `[]`. An empty array is not nullish, so `return row ??
+     null` returned `[]`; `[]` is truthy, so useTeamState's
+     `teamQ.data ? {...} : null` built `{ id: undefined, name: undefined }`;
+     Team.tsx's `if (!state.team)` therefore never fired, teamId was undefined so
+     trades and selections never loaded, holdings were empty, and InitialBuild
+     rendered. Every observed symptom follows, including the empty heading. The
+     operator's hypothesis was correct in full.
+     FIX: a SECOND helper, `unwrapMaybe`, for `.maybeSingle()` reads —
+     `unwrap`'s `?? []` contract is untouched, so none of its ten list call sites
+     was put at risk to fix a bug in none of them. The has-a-team decision is now
+     `teamIdentity()`, a total function Team.tsx branches on and the test pins
+     directly, so the branch that produced the visible symptom is covered even
+     though rendering is not testable in this harness.
+     WHY IT SURVIVED FOR MONTHS — the thing worth remembering: the four teams in
+     the demo season were written by the SEED SCRIPT, so the registration path
+     had never once been exercised by a real user, by a person or by a test.
+     Same shape as D25 (scoring engine verified, the database path feeding it was
+     not) and C11 (tests routed through a helper while the artifact an operator
+     would actually use was broken). The pattern is VERIFIED COMPONENT, UNTESTED
+     SEAM, and this is its fourth recurrence.
+     CONTROL RUN (mandatory, and the reason the test is the deliverable rather
+     than the line): test/c16.registration-path.test.ts drives the app's OWN
+     registerTeam and fetchMyTeam against pglite through the RLS shim, and was
+     run against the unfixed code in three configurations. Reverting the data
+     layer alone: 2 failures, `expected [] to be null`. Reverting the branch
+     alone: 2 failures, `expected { id: undefined, name: undefined } to be
+     null` — literally the object the hypothesis predicted. Reverting both (the
+     code exactly as it stood at main cb37e99): 4 failures. The test is
+     therefore capable of failing, and fails with the defect's own shape.
+     NOT SEEDED: no test in that file inserts a fantasy_teams row. Seeding teams
+     directly is what hid this defect, so every team in it is registered through
+     the app's own path.
+
 ## ENGINE-SLICE PRECONDITION — SATISFIED 10/08/2026 (S-F merged at main 773a077)
 The engine slice landed: O4's shape, D28's multiplier, D29's fixture index and
 D26's trigger are all BUILT and green. G1 is UNMOVED with stronger evidence than a
