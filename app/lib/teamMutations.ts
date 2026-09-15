@@ -118,6 +118,21 @@ export function translateRefusal(err: unknown): Refusal {
       serverMessage,
     };
   }
+  // ONE TEAM PER PERSON PER SEASON. Matched on the duplicate-key text plus the
+  // table rather than on an index NAME, because two different names can raise it:
+  // 0001 declares the constraint inline (Postgres names it
+  // fantasy_teams_season_id_owner_profile_id_key) while 0004's guard block would
+  // create `fantasy_teams_one_team_per_owner_season` on a schema that somehow
+  // lacked it. This clause MUST stay above the profiles clause below, which is
+  // broad enough to swallow a message mentioning owner_profile_id.
+  if (/duplicate key value/.test(m) && /fantasy_teams/.test(m)) {
+    return {
+      reason:
+        "You already have a team in this season. One team per person per season — if the page still shows a registration form, reload it.",
+      authority: "0001 UNIQUE (season_id, owner_profile_id) / binding decision 2 (G13 case 10)",
+      serverMessage,
+    };
+  }
   if (/config missing/.test(m)) {
     return {
       reason:
@@ -175,6 +190,47 @@ export async function registerTeam(args: {
     name: args.name.trim(),
   });
   throwOn(error);
+}
+
+/**
+ * RENAME AN EXISTING TEAM (item 4). `RegisterTeam` has always told participants
+ * the name "can be changed later"; this is the control that makes that true.
+ *
+ * IT BUILDS TO THE PERMISSION THAT ALREADY EXISTS — no migration. 0004's
+ * `fantasy_teams_update` policy admits `owner_profile_id = auth.uid()`, and
+ * `app.enforce_fantasy_team_participant_update` refuses any change to
+ * `owner_profile_id` or `season_id` from a non-manager. So name-only is the
+ * database's rule, not this function's: nothing here re-checks ownership, and a
+ * refusal surfaces through `translateRefusal` like every other server refusal.
+ * 0002's registration lock covers INSERT/DELETE only — a rename stays legal after
+ * the season locks, deliberately (the name is cosmetic; H2H home/away comes from
+ * circle orientation, never from the row).
+ *
+ * `.select()` IS LOAD-BEARING, for the reason adminMutations documents: under RLS
+ * an UPDATE the policy excludes is a silent no-op — zero rows, no error. Asking
+ * for the row back turns "not permitted" into a visible failure rather than a
+ * false success.
+ */
+export async function renameTeam(args: {
+  teamId: string;
+  name: string;
+}): Promise<{ id: string; name: string }> {
+  const trimmed = args.name.trim();
+  if (trimmed.length === 0) throw new Error("A team name cannot be blank.");
+
+  const { data, error } = await supabase
+    .from("fantasy_teams")
+    .update({ name: trimmed })
+    .eq("id", args.teamId)
+    .select("id,name")
+    .maybeSingle();
+  throwOn(error);
+  if (!data) {
+    throw new Error(
+      "The rename affected no rows — the database did not permit it for your account (row-level security).",
+    );
+  }
+  return data as { id: string; name: string };
 }
 
 // ---------------------------------------------------------------------------

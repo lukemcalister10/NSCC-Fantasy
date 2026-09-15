@@ -24,6 +24,7 @@ import {
   TradeBudgetNotice,
 } from "../components/team/TeamChrome";
 import { PoolPicker, SquadTable } from "../components/team/SquadPicker";
+import { TeamNameEditor } from "../components/team/TeamNameEditor";
 import { money } from "../lib/format";
 import type { PoolPlayer } from "../lib/teamQueries";
 import "../styles/team.css";
@@ -192,7 +193,24 @@ export function Team() {
 
   return (
     <div className="page">
-      <h1 className="page-title">{state.team.name}</h1>
+      {/* Inline layout rather than a new class: app/styles/team.css is outside this
+          slice's fences, so the rename control is placed without editing it. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: "var(--sp-2)",
+          flexWrap: "wrap",
+        }}
+      >
+        <h1 className="page-title">{state.team.name}</h1>
+        <TeamNameEditor
+          teamId={state.team.id}
+          name={state.team.name}
+          onRenamed={() => state.refetch()}
+        />
+      </div>
       <TeamTabs />
 
       <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />

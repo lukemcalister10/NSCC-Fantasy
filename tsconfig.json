@@ -15,5 +15,12 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src", "test"]
+  // `test` MOVED TO tsconfig.app.json (S-G). The suite now exercises app/ code
+  // directly — test/c16.registration-path.test.ts drives the real registerTeam /
+  // fetchMyTeam — and app/ needs jsx, DOM and vite/client types, which this
+  // program deliberately withholds. Keeping `test` here would have forced those
+  // into THIS program and so ended the one check that src/ compiles with pure
+  // node libs and no DOM, which matters for the engines (they run under tsx).
+  // Tests are still typechecked, by `npm run build` (tsc -p tsconfig.app.json).
+  "include": ["src"]
 }

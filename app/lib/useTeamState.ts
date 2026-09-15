@@ -12,6 +12,7 @@ import {
   useSeasonRounds,
   useTeamSelections,
   useTeamTrades,
+  teamIdentity,
   type PoolPlayer,
   type RoundBasic,
   type SelectionRow,
@@ -99,7 +100,12 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
   const roundSeqById = useMemo(() => roundSeqMap(rounds), [rounds]);
 
   const teamQ = useMyTeam(seasonId);
-  const teamId = teamQ.data?.id;
+  // ONE derivation of "have I got a team", used for both the id every dependent
+  // query keys off and the identity the page renders (C16). Deriving these
+  // separately is what let /team hold a teamId of `undefined` while still
+  // believing a team existed.
+  const team = useMemo(() => teamIdentity(teamQ.data), [teamQ.data]);
+  const teamId = team?.id;
 
   const tradesQ = useTeamTrades(teamId);
   const selectionsQ = useTeamSelections(teamId);
@@ -189,7 +195,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     openRounds,
     roundSeqById,
     allRoundsLocked: rounds.length > 0 && openRounds.length === 0,
-    team: teamQ.data ? { id: teamQ.data.id, name: teamQ.data.name } : null,
+    team,
     trades,
     selections,
     selectionsLoaded: !teamId || selectionsQ.isSuccess,
