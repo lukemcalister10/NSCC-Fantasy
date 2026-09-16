@@ -30,25 +30,11 @@ type Status =
  * Password SIGN-IN is untouched — it is the operator's fallback for accounts he
  * creates by hand.
  *
- * ── WHICH TAB OPENS FIRST, AND WHY ──────────────────────────────────────────
- * CREATE ACCOUNT. Round 1 locks 19/09, so for the first few days essentially all
- * traffic is people who have never been here; a returning participant signs in
- * weekly and reads a two-tab strip without help. The asymmetry of getting it
- * wrong decides it: a returning person who types into Create account is told
- * "that email already has an account — switch to Sign in" and is one click from
- * where they meant to be, whereas a new person who lands on Sign in gets
- * "Invalid login credentials", which names no way forward. The graceful failure
- * is the one this default produces. One line to flip if traffic turns over.
- *
- * ── NO PASSWORD RESET EXISTS ────────────────────────────────────────────────
- * There is no email, so there is no self-service reset, and the Sign in tab says
- * so out loud. A missing "forgot password?" link with no explanation generates
- * precisely the support messages the operator has agreed to absorb — but only if
- * people know to send them to him.
+ * Sign in is the default tab; new users can switch to account creation.
  */
 export function Login() {
   const { session, ready } = useAuth();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -132,19 +118,19 @@ export function Login() {
         <div className="segmented" role="tablist" aria-label="Sign-in method">
           <button
             role="tab"
-            aria-selected={creating}
-            className={`seg${creating ? " seg-active" : ""}`}
-            onClick={() => pick("create")}
-          >
-            Create account
-          </button>
-          <button
-            role="tab"
             aria-selected={!creating}
             className={`seg${!creating ? " seg-active" : ""}`}
             onClick={() => pick("password")}
           >
             Sign in
+          </button>
+          <button
+            role="tab"
+            aria-selected={creating}
+            className={`seg${creating ? " seg-active" : ""}`}
+            onClick={() => pick("create")}
+          >
+            Create account
           </button>
         </div>
 
@@ -195,11 +181,6 @@ export function Login() {
                     placeholder="••••••••"
                   />
                 </label>
-                <p className="login-note">
-                  At least {PASSWORD_MIN_LENGTH} characters. There is no password
-                  reset email — if you forget it, Luke resets it for you, so pick
-                  something you'll remember.
-                </p>
               </>
             ) : (
               <p className="login-note">

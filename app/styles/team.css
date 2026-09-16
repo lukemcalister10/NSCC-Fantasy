@@ -251,6 +251,8 @@
   .trade-grid { grid-template-columns: 1fr 1fr; }
 }
 .trade-side { min-width: 0; }
+.trade-side > .picker { margin-top: 0; }
+.trade-toolbar-spacer { min-height: 2.25rem; margin-bottom: var(--sp-3); }
 .trade-summary { padding: var(--sp-4); }
 .trade-line { font-size: var(--fs-sm); margin: 0 0 var(--sp-2); }
 

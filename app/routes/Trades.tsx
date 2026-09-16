@@ -215,6 +215,7 @@ export function Trades() {
       <div className="trade-grid">
         <section className="trade-side">
           <h2 className="section-title">Trade out</h2>
+          <div className="trade-toolbar-spacer" aria-hidden="true" />
           <ul className="picker-list">
             {state.holdings.map((h) => {
               const selected = sellId === h.playerId;
@@ -298,12 +299,7 @@ export function Trades() {
             </p>
             <CompositionMeter players={afterCarriers} squad={squad} />
           </>
-        ) : (
-          <p className="page-sub">
-            Pick one player to trade out and one to trade in. One trade is one sell and
-            one buy — they are written together, so a half-trade is not possible.
-          </p>
-        )}
+        ) : null}
 
         {blockers.length > 0 ? (
           <ul className="problem-list">
