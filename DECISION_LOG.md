@@ -1,3 +1,5 @@
+# DECISION LOG v2.3, 16/09/2026 (supersedes v2.2; delta = D35: self-service sign-up is email + password with no confirmation step, magic link removed, no self-service password reset, and the recorded open-door consequence)
+# (v2.2 header retained below for provenance)
 # DECISION LOG v2.2, 10/08/2026 (supersedes v2.1; delta = A13: four mid-slice rulings absorbed — milestone bonuses EXCLUSIVE, economy bonus PER INNINGS, second_innings_adjustment stored as a component, trade-time composition tightening; D28/D29/D26 all BUILT; ENGINE-SLICE PRECONDITION SATISFIED)
 ### Locked = operator-approved in spec sessions of 08/07/2026. Open items carry a
 ### DEFAULT (applies automatically at expiry unless overridden) and an EXPIRY.
@@ -342,6 +344,59 @@
       d. Resolve the per-innings vs per-match bonus question (O4 sub-item). The
          S-A e2e test pins today's behaviour explicitly so the change is visible.
 
+## LOCKED — OPERATOR RULING OF 15/09/2026 (D35)
+- D35 SELF-SERVICE SIGN-UP IS EMAIL + PASSWORD, WITH NO CONFIRMATION STEP.
+      BUILT S-H, 16/09/2026. Until this slice there was no way to create an
+      account: people could sign in but nobody could join, so the league had no
+      path from "here is the URL" to a named team.
+      EMAIL DELIVERY IS OFF AND STAYING OFF. Supabase's built-in sender only
+      delivers to addresses on the project team, and a custom sender needs either
+      a verified domain (which the operator does not have) or another account to
+      configure. Google sign-in was considered and DECLINED: it needs credentials
+      created in Google's console and excludes anyone without a Google account.
+      Operator ruling: email + password, self-service, no confirmation.
+      a. THE MAGIC LINK TAB IS REMOVED, not merely hidden. It called
+         `signInWithOtp`, which needs the email this project cannot send, so it
+         could only ever produce the "email rate limit exceeded" error the
+         operator hit on 15/09. Its place is taken by a Create account tab
+         calling `supabase.auth.signUp`.
+      b. PASSWORD SIGN-IN IS UNTOUCHED. It is the operator's fallback for any
+         account he has to create by hand, and this slice does not alter it.
+      c. ACCEPTED CONSEQUENCE — NO SELF-SERVICE PASSWORD RESET. There is no email
+         to send one with, so a forgotten password is reset by the operator in
+         the Supabase dashboard. The Sign in tab SAYS SO in one line rather than
+         leaving a silently missing "forgot password?" link, because the support
+         messages the operator has agreed to absorb only reach him if people know
+         to send them.
+      d. RECORDED CONSEQUENCE — ANYONE WITH THE URL CAN CREATE AN ACCOUNT, and is
+         then inside data classed INTERNAL under D17, in a pool that contains
+         juniors. There is no invitation, no allowlist and no confirmation step
+         standing in the way. The operator has been told and has CHOSEN SPEED for
+         round 1. A join code on the sign-up form is the cheap remedy if he later
+         wants one; it was explicitly NOT in scope for S-H.
+      e. OPERATOR CONFIGURATION THIS DEPENDS ON, in Supabase → Authentication →
+         Sign In / Providers → Supabase Auth: "Allow new users to sign up" = ON
+         (already on) and "Confirm email" = OFF (the operator's action, not the
+         builder's). With "Confirm email" ON, `signUp` returns a user but NO
+         session and queues an email that cannot be delivered, leaving the person
+         staring at a form that appeared to work.
+      f. THE CODE DOES NOT ASSUME (e). The no-session-returned case is detected
+         explicitly and says what happened — "your account was created but this
+         site cannot send confirmation emails; ask Luke to confirm it" — so a
+         config change cannot silently break sign-up. Pinned by test.
+      LIBRARY SHAPE PINNED RATHER THAN ASSUMED (the S-G postgrest-js discipline).
+      Read out of the installed @supabase/supabase-js 2.110.2 / auth-js 2.110.2:
+      `signUp` RETURNS auth errors rather than throwing them; an already-
+      registered address with confirmations OFF comes back as an AuthApiError
+      with code `user_already_exists` (or `email_exists`); with confirmations ON
+      it comes back as NO ERROR and an anti-enumeration user carrying
+      `identities: []`. Those last two shapes both arrive as `session === null`
+      with a user object and mean OPPOSITE things, so the empty-identities check
+      is the only thing separating "you already have an account" from "your
+      account was made but cannot be used" — collapsing them would tell half the
+      people the exact reverse of the truth. `app/auth/signUpOutcome.ts` is that
+      split, as a plain total function, and test/d35.signup-outcomes.test.ts
+      pins it (control-run against four deliberate mutations; see the S-H report).
 ## LOCKED — OPERATOR RULINGS AND FINDINGS, 11/09/2026 AND 15/09/2026 (A14)
 ### Supersedes the draft A14 circulated on 11/09/2026, which was issued before the
 ### 15/09 sitting and therefore covered only the first day. Paste THIS block; discard
