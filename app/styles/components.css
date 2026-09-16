@@ -127,7 +127,32 @@
   color: var(--ink-faint);
   font-size: var(--fs-sm);
 }
+.season-picker {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+}
+.season-picker > span {
+  display: none;
+}
+.season-picker select {
+  padding: var(--sp-1) var(--sp-2);
+  max-width: 8rem;
+}
+.season-banner {
+  max-width: var(--maxw);
+  margin: var(--sp-3) auto 0;
+}
 @media (min-width: 640px) {
+  .season-picker > span {
+    display: inline;
+  }
+  .season-picker select {
+    max-width: 12rem;
+  }
   .account-email {
     display: inline;
   }

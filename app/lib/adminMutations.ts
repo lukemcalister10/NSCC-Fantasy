@@ -202,19 +202,32 @@ export async function createMatch(input: MatchInput) {
   );
 }
 
-export async function updateMatch(matchId: string, patch: Partial<MatchInput>) {
+export function matchUpdateRow(
+  patch: Partial<MatchInput>,
+  currentStatus: MatchInput["status"],
+): Record<string, unknown> {
   const row: Record<string, unknown> = {};
   if (patch.roundId !== undefined) row["round_id"] = patch.roundId;
   if (patch.grade !== undefined) row["grade"] = patch.grade;
   if (patch.opponent !== undefined) row["opponent"] = patch.opponent;
   if (patch.finalDayDate !== undefined) row["final_day_date"] = patch.finalDayDate;
-  if (patch.status !== undefined) {
+  if (patch.status !== undefined && patch.status !== currentStatus) {
     row["status"] = patch.status;
     // finalised_at is what the recompute orchestrator orders matches by within a
-    // round, so it is stamped when the status says the match is done and cleared
-    // when it is not — never left stale.
+    // round. Stamp it only on a genuine transition to finalised: metadata edits
+    // to an already-finalised match must preserve its original ordering instant.
+    // Leaving finalised clears the mark so a later re-finalisation gets a fresh one.
     row["finalised_at"] = patch.status === "finalised" ? new Date().toISOString() : null;
   }
+  return row;
+}
+
+export async function updateMatch(
+  matchId: string,
+  patch: Partial<MatchInput>,
+  currentStatus: MatchInput["status"],
+) {
+  const row = matchUpdateRow(patch, currentStatus);
   const rows = ok(
     await supabase.from("matches").update(row).eq("id", matchId).select("id"),
     "save match",

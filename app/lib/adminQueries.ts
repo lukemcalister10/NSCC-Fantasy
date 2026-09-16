@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import type { LeagueConfig, PlayerRole } from "../../src/config/types";
+import { useSeasonSelection } from "./SeasonSelectionContext";
 
 /**
  * MANAGER-BACKEND READS. Same anon client, same RLS (0004) — a manager is just an
@@ -31,17 +32,18 @@ export interface AdminSeason {
 }
 
 export function useAdminSeason() {
+  const selectedSeasonId = useSeasonSelection()?.selectedSeasonId ?? null;
   return useQuery({
-    queryKey: ["admin", "season"],
+    queryKey: ["admin", "season", selectedSeasonId ?? "latest"],
     staleTime: ADMIN_STALE,
     queryFn: async (): Promise<AdminSeason | null> => {
-      const rows = unwrap<AdminSeason[]>(
-        await supabase
-          .from("seasons")
-          .select("id,name,config,locked_at,created_at")
-          .order("created_at", { ascending: false })
-          .limit(1),
-      );
+      let query = supabase
+        .from("seasons")
+        .select("id,name,config,locked_at,created_at");
+      query = selectedSeasonId
+        ? query.eq("id", selectedSeasonId)
+        : query.order("created_at", { ascending: false }).limit(1);
+      const rows = unwrap<AdminSeason[]>(await query);
       return rows[0] ?? null;
     },
   });
