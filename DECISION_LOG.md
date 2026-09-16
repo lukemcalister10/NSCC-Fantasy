@@ -587,24 +587,38 @@ DoD gate — DEFINITION_OF_DONE v1.2 remains FROZEN and UNCHANGED (Law 3).
      register a fantasy team in the 2026/27 season: /team rendered the squad
      builder for a team that did not exist, under an EMPTY <h1>, while
      `select * from fantasy_teams where season_id = <2026/27>` returned no rows.
-     CAUSE, verified before fixing rather than taken from the spec (D26's
+     CAUSE (operator ruling on the framing, 15/09/2026, after the fix landed:
+     the structural flaw is the cause and the empty list is only what exposed
+     it). useTeamState derived TWO answers to "have I got a team" from one query,
+     INDEPENDENTLY: `teamQ.data?.id` for the id every dependent query keys off,
+     and `teamQ.data ? {...} : null` for the identity the page renders. Nothing
+     held those two in agreement, so the page could believe a team existed while
+     holding no id for it — which is exactly the state an operator saw. Any
+     malformed value from any producer, present or future, reaches the screen
+     through that gap; the `?? []` below was merely the producer that did.
+     TRIGGER, verified before fixing rather than taken from the spec (D26's
      standing lesson): `unwrap()` in app/lib/teamQueries.ts returned
      `res.data ?? []`, which is correct for its ten list callers. `useMyTeam`
      paired it with `.maybeSingle()`, which resolves to `data: null` when no row
      matches — read out of the installed @supabase/postgrest-js, not assumed —
      so "no team" became `[]`. An empty array is not nullish, so `return row ??
-     null` returned `[]`; `[]` is truthy, so useTeamState's
-     `teamQ.data ? {...} : null` built `{ id: undefined, name: undefined }`;
-     Team.tsx's `if (!state.team)` therefore never fired, teamId was undefined so
-     trades and selections never loaded, holdings were empty, and InitialBuild
-     rendered. Every observed symptom follows, including the empty heading. The
-     operator's hypothesis was correct in full.
-     FIX: a SECOND helper, `unwrapMaybe`, for `.maybeSingle()` reads —
+     null` returned `[]`; `[]` is truthy, so the identity branch built
+     `{ id: undefined, name: undefined }` while the id branch produced
+     `undefined`; Team.tsx's `if (!state.team)` therefore never fired, trades and
+     selections never loaded for want of a teamId, holdings were empty, and
+     InitialBuild rendered. Every observed symptom follows, including the empty
+     heading. The operator's hypothesis was correct in full.
+     FIX, in two parts matching the two above. STRUCTURAL: the has-a-team
+     decision is now `teamIdentity()`, ONE total function that both the id and
+     the rendered identity derive from, so they cannot disagree; it is what
+     Team.tsx branches on and what the test pins directly, and it rejects `[]`,
+     `{}` and a half-built row rather than rendering `undefined`. This is the
+     part that closes the class of defect, and it was not in the brief.
+     TRIGGER: a SECOND helper, `unwrapMaybe`, for `.maybeSingle()` reads —
      `unwrap`'s `?? []` contract is untouched, so none of its ten list call sites
-     was put at risk to fix a bug in none of them. The has-a-team decision is now
-     `teamIdentity()`, a total function Team.tsx branches on and the test pins
-     directly, so the branch that produced the visible symptom is covered even
-     though rendering is not testable in this harness.
+     was put at risk to fix a bug in none of them.
+     Both parts were control-run separately (below) precisely because either
+     alone would have hidden the other.
      WHY IT SURVIVED FOR MONTHS — the thing worth remembering: the four teams in
      the demo season were written by the SEED SCRIPT, so the registration path
      had never once been exercised by a real user, by a person or by a test.

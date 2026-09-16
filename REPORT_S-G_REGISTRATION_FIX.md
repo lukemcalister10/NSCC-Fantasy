@@ -17,7 +17,14 @@ People can register a team again. Your hypothesis was right in every detail —
 including the empty heading — and I verified it against the code before changing
 anything rather than taking it on trust.
 
-The line was one `?? []`. The real work, as you said, was the test. There was
+One correction of emphasis, which is your ruling and which I think is right: the
+`?? []` was the **trigger**, not the cause. The cause was that `useTeamState`
+derived the team's id and the team's identity **separately**, so the page could
+believe a team existed while holding no id for it. That gap is what let a bad
+value reach the screen at all, and it would have done so again from any other
+producer. §2.2 and §3.1 are written that way round.
+
+The trigger was one `?? []`. The real work, as you said, was the test. There was
 never a test that did what a person does: sign in, find no team, register one,
 see it. The four demo teams were written by the seed script, so that path had
 never been exercised by anybody. I have now written that test, and it drives the
@@ -62,19 +69,30 @@ the broken caller **and** the class of defect (item 3's adjacent case) while
 leaving the list contract untouched. `unwrap` now carries a comment naming C16 and
 saying not to pair it with `.maybeSingle()`.
 
-**2.2 — I extracted the has-a-team decision into a plain function** (the
-kickoff left this to me, asking for justification either way). `teamIdentity()` is
-now the single derivation, used by `useTeamState` for both the team id and the
-rendered identity, and pinned directly by the test.
+**2.2 — I extracted the has-a-team decision into a plain function, and this is
+the part that addresses the actual cause** (the kickoff left the extraction to me,
+asking for justification either way). `teamIdentity()` is now the single
+derivation, used by `useTeamState` for both the team id and the rendered identity,
+and pinned directly by the test.
 
-Why: the *visible* symptom — a squad builder for a team that does not exist, under
-an empty `<h1>` — was produced at the **branch**, not at the query. Pinning only
-the query would leave the place the participant actually sees uncovered, and since
-rendering is not testable here, the branch is the closest thing to the symptom
-that a test can reach. It also collapses a duplicated derivation:
-`useTeamState` previously computed `teamQ.data?.id` and
-`teamQ.data ? {...} : null` separately, which is what let /team hold a `teamId`
-of `undefined` while still believing a team existed.
+Why, stated as the cause rather than as a tidy-up — **operator ruling on the
+framing, taken after the fix landed, and the framing I now consider correct:**
+`useTeamState` derived **two** answers to "have I got a team" from one query,
+independently — `teamQ.data?.id` for the id every dependent query keys off, and
+`teamQ.data ? {...} : null` for the identity the page renders. Nothing held the
+two in agreement, so the page could believe a team existed **while holding no id
+for it**, which is exactly the state you saw on 15/09. The brief described the
+empty-list symptom; that gap is the structural flaw beneath it, and **any**
+malformed value from **any** producer reaches the screen through it. The `?? []`
+was merely the producer that did. Collapsing the two derivations into one total
+function is therefore what closes the class of defect rather than the incident —
+and it is why the control run exercises the two halves of the fix separately
+(§3.3 A and B): either alone would have masked the other.
+
+A second reason it earns its place: the *visible* symptom — a squad builder for a
+team that does not exist, under an empty `<h1>` — is produced at the **branch**,
+not at the query. Since rendering is not testable in this harness, the branch is
+the closest thing to the symptom that a test can reach.
 
 **2.3 — Item 5's prompt goes on first sign-in, not in a settings page** (your
 call to me). It is mounted inside `RequireAuth`, so every authenticated view is
@@ -98,8 +116,9 @@ this write." It was reported, not swallowed — but it did not say why.
 
 ### 3.1 Item 1 — the defect (MUST). VERIFIED.
 
-**Cause, verified against the code and against the installed library, not assumed.**
-Your hypothesis, confirmed link by link:
+**The trigger chain, verified against the code and against the installed library,
+not assumed.** The *cause* is the split derivation in §2.2; this is the producer
+that exposed it. Your hypothesis, confirmed link by link:
 
 | Link | Verified how |
 |---|---|
