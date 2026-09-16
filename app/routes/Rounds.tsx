@@ -176,13 +176,6 @@ function RoundCard({
               })}
             </ul>
           )}
-          {round.fixtures.some((f) => f.away === null) ? (
-            <span className="fixture-bye-note">
-              A bye is not a rest: the byed team is scored against that round&rsquo;s
-              median team score and takes a win, loss or tie from it (D18), so it still
-              counts as a game played on the ladder.
-            </span>
-          ) : null}
           {disagreement ? (
             <div className="refusal" role="alert">
               <strong className="refusal-reason">
@@ -231,11 +224,6 @@ export function Rounds() {
   return (
     <div className="page">
       <h1 className="page-title">Rounds &amp; fixtures</h1>
-      <p className="page-sub">
-        {provisional
-          ? "Season not yet locked — fixtures are provisional until the team set is frozen."
-          : "Fixtures are set for the season."}
-      </p>
 
       {season.isLoading || rounds.isLoading ? (
         <Loading />

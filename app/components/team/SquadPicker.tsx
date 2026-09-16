@@ -30,6 +30,27 @@ export function SquadTable({
   onSetViceCaptain: (playerId: string) => void;
   captaincyDisabledReason: string | null;
 }) {
+  const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
+  const sortedHoldings = useMemo(
+    () =>
+      [...holdings].sort((a, b) => {
+        const aRole = a.player?.role;
+        const bRole = b.player?.role;
+        const roleDifference =
+          (aRole ? squadRoleOrder.indexOf(aRole) : squadRoleOrder.length) -
+          (bRole ? squadRoleOrder.indexOf(bRole) : squadRoleOrder.length);
+        if (roleDifference !== 0) return roleDifference;
+
+        const priceDifference = (b.currentPrice ?? 0) - (a.currentPrice ?? 0);
+        if (priceDifference !== 0) return priceDifference;
+
+        return (a.player?.display_name ?? "").localeCompare(
+          b.player?.display_name ?? "",
+        );
+      }),
+    [holdings],
+  );
+
   return (
     <div className="card table-card">
       <table className="table squad-table">
@@ -42,12 +63,12 @@ export function SquadTable({
             {/* Named precisely: this is gain/loss against the PURCHASE price, not
                 the last price step shown on the player list (Standing Rule 2). */}
             <th className="col-num">Since bought</th>
-            <th className="col-cap">C</th>
+            <th className="col-cap">C 2×</th>
             <th className="col-cap">VC</th>
           </tr>
         </thead>
         <tbody>
-          {holdings.map((h) => {
+          {sortedHoldings.map((h) => {
             const gain =
               h.currentPrice !== null ? h.currentPrice - h.purchasePrice : 0;
             return (
@@ -101,13 +122,7 @@ export function SquadTable({
       </table>
       {captaincyDisabledReason ? (
         <p className="table-foot-note">{captaincyDisabledReason}</p>
-      ) : (
-        <p className="table-foot-note">
-          Captain scores double; the vice-captain inherits if the captain does not
-          play. Both absent means nobody is doubled (D10). Captaincy carries forward
-          to the next round unless you change it.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

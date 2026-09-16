@@ -148,9 +148,8 @@ export function LockNotice({
   }
   return (
     <div className="lock-notice lock-open" role="status">
-      Changes apply to <strong>{activeRound.name}</strong>, which locks{" "}
-      <strong>{dateTime(activeRound.lock_at)}</strong>. After that moment every team
-      change and trade for this round is refused server-side (D6/G4).
+      <strong>{activeRound.name}</strong> locks{" "}
+      <strong>{dateTime(activeRound.lock_at)}</strong>.
     </div>
   );
 }
@@ -158,15 +157,7 @@ export function LockNotice({
 /** Trades used / remaining for the round, from config (O1). */
 export function TradeBudgetNotice({ budget }: { budget: TradeBudget }) {
   if (budget.initialBuild) {
-    return (
-      <div className="trade-budget trade-budget-initial">
-        <strong>Initial squad construction.</strong> You held nothing entering this
-        round, so buys made in it are founding buys and consume{" "}
-        <strong>zero trades</strong> (G15) — including changes of mind while you build.
-        They are still bound by team size, composition and the salary cap, and by this
-        round&rsquo;s lock.
-      </div>
-    );
+    return null;
   }
   return (
     <div className="trade-budget">
