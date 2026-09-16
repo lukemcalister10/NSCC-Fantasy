@@ -397,6 +397,201 @@
       people the exact reverse of the truth. `app/auth/signUpOutcome.ts` is that
       split, as a plain total function, and test/d35.signup-outcomes.test.ts
       pins it (control-run against four deliberate mutations; see the S-H report).
+## LOCKED — OPERATOR RULINGS AND FINDINGS, 11/09/2026 AND 15/09/2026 (A14)
+### Supersedes the draft A14 circulated on 11/09/2026, which was issued before the
+### 15/09 sitting and therefore covered only the first day. Paste THIS block; discard
+### that one. Dates below are as recorded by the database, not as reconstructed.
+
+- G10 CLOSED — OPERATOR-ACTION-VERIFIED, 11/09/2026. Verified on
+  nsccfantasy.vercel.app as manager lukemcalister10@gmail.com. Rehearsed and
+  fired on the scratch season "NSCC Fantasy — Demo Season (scratch)", locked
+  2026-09-11 02:06:37Z (12:06 Sydney). Cap computed $297,400 over 51 players at
+  a mean of $49,567, hand-checked independently (6 × 49,567 = 297,402 →
+  $297,400 nearest $100, halves up). Thirteen refusal probes all blocked, each
+  by the guard that should own it: six config categories by trg_seasons_lock,
+  three player categories by trg_players_lock, registration by
+  trg_fantasy_teams_registration_lock, plus the door itself (locked_at neither
+  cleared nor moved) and the frozen pool (no post-lock removal). Mid-season
+  addition still succeeded at the floor with the frozen cap unmoved (C4/O3),
+  proven by adding a 52nd player.
+  PRE-LOCK PROPAGATION VERIFIED ON LIVE INFRASTRUCTURE, not pglite: perRun
+  1 → 2, recompute — every batting figure rose by exactly that player's run
+  count while bowling figures were untouched; perRun → 1, recompute — every
+  figure returned BYTE-IDENTICALLY (83/50/5/20/85/25/0). D13 and G3, on the
+  real database.
+  METHOD NOTE, carried: MANAGER_VERIFY's S8 asks for thirteen statements run
+  individually as an authenticated manager. They were instead run as one
+  plpgsql probe function that attempts each, records whether it was refused,
+  and rolls every attempt back through a deliberate exception. The role
+  requirement was dropped with reason: these refusals come from TRIGGERS, which
+  fire for every role; the authenticated-manager requirement governs RLS
+  checks, not these. The probe was CONTROL-RUN both ways against a local
+  replica of the trigger stack before use — all thirteen pass through on an
+  unlocked season, all thirteen refuse on a locked one — so it is capable of
+  failing. Left in place as public.lock_check() for re-use on the real season.
+
+- D31 SINGLE POOL, NO STAGGERED START (operator, 15/09/2026, SUPERSEDING the
+  staggered-competition plan explored earlier that day). Five sides nominated —
+  four Manly (first round 19/09/2026), one NCU (first round 10/10/2026) — but
+  every registered player is available from round 1: "No NCU players for now.
+  Everyone will play Manly early season; if a 5th team is cut, it will be the
+  NCU one." CONSEQUENCE: no eligibility flag, no bonus-trade allowance and no
+  visibility marker is built or needed. The whole class of problem is removed
+  rather than engineered around. If the fifth side does start on 10/10 it draws
+  from the same 68-player pool; more players appear in lineups each week and
+  nothing structural changes.
+  DECLINED ON THE WAY, recorded so it is not re-proposed: a one-off extra trade
+  allowance in a single round is NOT expressible — tradesPerRound is one
+  season-wide config value frozen at lock (D13) and enforced per (team, round)
+  against that one number by G15's trg_trades_limits.
+
+- D32 TEAM SIZE 9, PERMANENT (operator, 15/09/2026, confirmed explicitly as a
+  one-way decision). O2's four-team row is selected — teamSize 9, BAT ≥3,
+  BWL ≥3, AR ≥1, WK ≥1, 1 flex — and O1 resolves to 3 trades per round (the 4
+  and 5+ rows agree, so the trade count needed no separate ruling). O1 and O2
+  are RESOLVED and no longer open.
+  REASONING, recorded because the row was NOT picked by counting club sides:
+  team size need not track the number of sides. O2's table is a rule of thumb
+  about pool depth, and the pool is 68 either way. Size 9 is robust to the
+  fifth side starting OR being cut, which size 11 is not, and it fits the
+  actual supply — only 7 returning players are bowlers, and 9-a-side needs
+  three rather than four. It is also the sharper economy: the dearest player
+  costs 29% of the cap at size 9 against 24% at size 11, so premium picks bind
+  harder and squads diverge more.
+  MID-SEASON EXPANSION EXPLICITLY DECLINED. The operator proposed expanding to
+  11 if the fifth side started, with two free trades and two extra slots'
+  worth of cap. It requires changing three frozen categories post-lock
+  (teamSize, cap, tradesPerRound) — i.e. a sanctioned door through the wall
+  G10 exists to be. It would also invalidate EVERY squad in the league on
+  changeover morning (nine players where eleven are required, minimums rising
+  3→4 in two roles), so G15 would refuse everyone's trades until they had
+  rebuilt. Not built.
+
+- D33 NEWCOMER PRICING BY ROLE MEDIAN (operator, 15/09/2026). AMENDS D4's
+  "zero-history = floor" for the 26/27 season.
+  THE PROBLEM: of 68 registrants, 31 have no 25/26 history — 46% of the pool.
+  At the floor the cheapest legal squad was computable entirely from unknowns
+  and the cap collapsed to $243,200, which turns the competition into guessing
+  which strangers can play rather than judging cricketers.
+  WHY NOT ONE FLAT NUMBER: a single pool median would price a new keeper 36%
+  above a typical keeper (median WK $21,900) and a new allrounder 23% BELOW a
+  typical allrounder (median AR $38,600) — an arbitrage in the one role a
+  squad can hold at most two of. Median rather than mean, because the mean is
+  pulled by four expensive returners.
+  RULED: each player with no 25/26 history takes the MEDIAN starting price of
+  RETURNING players in their own role. 26/27 values — BAT $29,100 · BWL
+  $28,800 · AR $38,600 · WK $21,900. Returning players are unaffected: all 37
+  prices were re-derived from D4 independently and reproduce exactly.
+  RESULT: pool mean $31,748.53, cap at lock $285,700 = 9 × mean.
+  IMPLEMENTATION NOTE, worth reading before anyone "fixes" it: the CSV importer
+  REFUSED all 31, correctly. It never trusts the file's price column — every
+  price is recomputed through the D4/G14 engine from games and points, and a
+  row it cannot price is blocked rather than imported on the file's word. That
+  is the same guard that caught this seat's banker's-rounding error on the
+  previous list. The 31 were therefore inserted directly, with registry_key set
+  to the normalised display name exactly as createPlayer and importPlayers do
+  (verified in adminMutations.ts, not assumed), so nothing about those rows is
+  special afterwards. Names were checked against D22 normalisation first: none
+  is altered by it.
+  STILL OPEN, operator to confirm before lock: an assisted run-out pays
+  perRunOutAssisted to EACH participant (15 + 15 = 30 across two fielders)
+  while an unassisted one pays 15 to one. O4 says "runout 15 (both kinds)".
+  May be deliberate; unconfirmed.
+
+- D34 LATE ENTRANTS (operator, 15/09/2026). Season lock closes the H2H FIXTURE
+  SET permanently and that half is immovable: fixtures are DERIVED from the
+  sorted team set (D21), so adding a team in week four changes the pairings
+  computed for weeks one to three and rewrites settled results — the same
+  hindsight failure as D24 and D29, through a third door.
+  Everything else stays open to late entrants. Ruled: same $285,700 cap; their
+  initial squad pays prices AS AT THE DAY THEY ENTER, not starting prices;
+  their overall-points total starts at zero and therefore trails anyone who has
+  played every week; they compete in the weekly round leaderboard (where they
+  can win outright) and in the overall points leaderboard; they are excluded
+  from H2H fixtures and from the ladder. The schema already separates these —
+  `ladder` and `overall_leaderboard` are distinct tables built as distinct
+  things.
+  NOT BUILT. Named slice, scheduled AFTER season lock. Nobody is permanently
+  excluded by locking on 19/09; a late registrant simply waits for the slice.
+  CORRECTION RECORDED: the review seat first told the operator that late entry
+  "can never be added to this season" after lock. That was WRONG. Registration
+  is guarded by a database rule that a deliberate, recorded change can relax;
+  what is genuinely immovable post-lock is the ECONOMY (prices, roles, team
+  size, scoring, cap), because changing those rewrites results already played.
+  The operator pushed back; the pushback was correct.
+
+- C14 (NEW, cosmetic, polish slice). On a LOCKED season the settings page still
+  renders "the lock will compute $X" beneath the salary-cap field, recalculated
+  live over the current pool. Observed 11/09/2026: with a 52nd player added
+  post-lock the stored cap correctly read $297,400 while the hint read
+  $292,700 — a cap the lock can never compute, because it has already run and
+  cannot run again. Harmless to data, maximally misleading in position: it is
+  the one screen where a wrong number makes an operator distrust everything
+  else. FIX: suppress or reword the hint once locked_at is set.
+
+- C15 (CORRECTION TO A STANDING DESCRIPTION). 0008 and MANAGER_VERIFY both
+  describe `active = false` as "not selectable". Verified against the code
+  15/09/2026: NOTHING enforces it. Neither enforce_selection_composition nor
+  enforce_trade_limits consults it, so no database rule refuses an inactive
+  player. What it actually does is filter the participant-facing list —
+  app/lib/queries.ts usePlayers applies .eq("active", true) — so an inactive
+  player is INVISIBLE to participants rather than flagged. Admin screens still
+  show them. It is not frozen by season lock and can be toggled post-lock.
+  BINDING: do not implement the "not selectable" wording as a server-side block
+  without an explicit operator ruling. The flag's real behaviour is HIDE.
+
+- FINDING — MIGRATION DRIFT BETWEEN THE DEPLOYED APP AND THE LIVE DATABASE
+  (11/09/2026). Migrations 0008, 0009 and 0010 had NEVER been applied to the
+  live project, though all three merged to main on 10/08/2026 and the frontend
+  depending on them had been deployed since. Surfaced only because a player
+  removal returned a raw foreign-key error instead of 0008's named refusal.
+  Confirmed by direct probe: 0001–0007 present, 0008–0010 absent. Applied
+  11/09/2026 and re-probed green.
+  TWO CAUSES, both process:
+   (i) 0008's apply instruction lives INSIDE MANAGER_VERIFY step S0 — the very
+       runbook that had not been run. The instruction was unreachable from
+       where the operator stood.
+   (ii) 0009 and 0010 have NO apply instruction anywhere. The engine slice
+       merged after MANAGER_VERIFY was last revised and added none. The
+       operator could not follow an instruction that does not exist.
+  AGGRAVATING: the review-seat handover of 10/08/2026 asserted "migrations
+  0001–0010 applied to the live project" and the incoming seat repeated it
+  unverified. An inherited claim about live state is a hypothesis, exactly like
+  a spec that names a file (D26's lesson, third recurrence).
+  ALSO FOUND AND CLOSED THE SAME DAY: the live demo season's config predated
+  the engine slice and was MISSING all eight keys S-F added (perFifty,
+  perCentury, perDuck, perNotOut, perMaiden, perFiveWicketHaul,
+  econBonusPerNetBall, secondInningsMultiplier). ScoringConfig types every one
+  as a required number with no defaulting layer, so a recompute would have read
+  undefined. Repaired through the settings page to the fixture-neutral values
+  (zeros, multiplier 1.0) and verified against the stored row.
+  STANDING RULE 10, to be carried into KICKOFF at its next revision:
+    a. A build session that adds anything under supabase/migrations/ MUST add a
+       numbered apply step to MANAGER_VERIFY in the same PR, naming the file
+       and what it does. A migration with no operator-facing apply instruction
+       is not finished.
+    b. The review seat verifies that instruction exists before treating a slice
+       as landed, and never records live-database state on inherited
+       authority — it is probed or it is unknown.
+    c. A season's config must be written with EVERY key its types require. A
+       season created by copying an older config row inherits this same hole.
+
+- SEASON 2026/27 CREATED, 15/09/2026 05:07:11Z. "NSCC Fantasy 2026/27",
+  teamSize 9, tradesPerRound 3, secondInningsMultiplier 0.5, cap placeholder
+  285700 (the lock recomputes and overwrites it). All 23 scoring keys, 5
+  pricing keys and 4 squad keys present and checked. O4's real values are in a
+  season config for the first time; they were verified by reproducing D28's
+  worked example exactly — innings 137, innings 59, adjustment to 30, base 167,
+  captain 334 — so a wrong value would have broken the example rather than
+  passing silently. Pool loaded: 68 players, 0 unpriced, mean $31,749, cap at
+  lock $285,700.
+  ROLE CHANGES CONFIRMED by the operator against the 25/26 list: Damir
+  Karamehmedovic BWL→AR, Geoff Pritchard AR→BAT, Joshua Smythe BAT→WK, Tristan
+  Henry BAT→AR. Keeper supply is now 7 (from 4 + 1), so D23's known thinness is
+  resolved; no player carries the wk_eligible flag, which freezes at lock.
+  16 players from the 25/26 list did not return, including four of the five
+  most expensive bowlers (Darke, Sivakumar, Gowda, Kannan). Ten of the
+  seventeen bowlers in the pool are therefore newly priced under D33.
 
 ## OPEN — DEFAULTS APPLY AT EXPIRY
 - O1 Trades per round (A7, 09/07/2026 — resolved to a contingency table, keyed
