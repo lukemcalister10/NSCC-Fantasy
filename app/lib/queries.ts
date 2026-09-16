@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import { useAuth } from "../auth/AuthProvider";
 import { generateRound } from "../../src/recompute/roundRobin";
 import type { PlayerRole } from "../../src/config/types";
+import { useSeasonSelection } from "./SeasonSelectionContext";
 
 /**
  * Read layer. Every hook is a plain `supabase.from(...).select(...)` under the
@@ -159,19 +160,36 @@ export function useIsManager() {
 // ── Season (auto-pick the most-recent) ──────────────────────────────────────
 
 export function useSeason() {
+  const selectedSeasonId = useSeasonSelection()?.selectedSeasonId ?? null;
   return useQuery({
-    queryKey: ["season"],
+    queryKey: ["season", selectedSeasonId ?? "latest"],
     staleTime: STALE,
     queryFn: async (): Promise<Season | null> => {
-      const rows = unwrap<Season[]>(
+      let query = supabase
+        .from("seasons")
+        .select("id,name,locked_at,created_at");
+      query = selectedSeasonId
+        ? query.eq("id", selectedSeasonId)
+        : query.order("created_at", { ascending: false }).limit(1);
+      const rows = unwrap<Season[]>(await query);
+      return rows[0] ?? null;
+    },
+  });
+}
+
+/** Manager chrome only. The caller must keep this disabled until manager=true. */
+export function useSeasons(enabled: boolean) {
+  return useQuery({
+    queryKey: ["seasons"],
+    enabled,
+    staleTime: STALE,
+    queryFn: async (): Promise<Season[]> =>
+      unwrap<Season[]>(
         await supabase
           .from("seasons")
           .select("id,name,locked_at,created_at")
-          .order("created_at", { ascending: false })
-          .limit(1),
-      );
-      return rows[0] ?? null;
-    },
+          .order("created_at", { ascending: false }),
+      ),
   });
 }
 
@@ -275,9 +293,11 @@ export function usePlayers(seasonId: string | undefined) {
 // ── Player profile ──────────────────────────────────────────────────────────
 
 export function usePlayer(playerId: string | undefined) {
+  const season = useSeason();
+  const seasonId = season.data?.id;
   return useQuery({
-    queryKey: ["player", playerId],
-    enabled: !!playerId,
+    queryKey: ["player", seasonId, playerId],
+    enabled: !!playerId && !!seasonId,
     staleTime: STALE,
     queryFn: async (): Promise<PlayerProfile | null> => {
       const player = unwrap<{
@@ -291,6 +311,7 @@ export function usePlayer(playerId: string | undefined) {
           .from("players")
           .select("id,display_name,role,wk_eligible,starting_price")
           .eq("id", playerId!)
+          .eq("season_id", seasonId!)
           .single(),
       );
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AuthApiError, AuthError, AuthWeakPasswordError } from "@supabase/auth-js";
+import { AuthApiError, AuthError, AuthWeakPasswordError } from "@supabase/supabase-js";
 import type { Session, User } from "@supabase/supabase-js";
 import {
   PASSWORD_MIN_LENGTH,

@@ -301,7 +301,7 @@ function ScorecardEditor({
   });
 
   const finalise = useMutation({
-    mutationFn: () => updateMatch(match.id, { status: "finalised" }),
+    mutationFn: () => updateMatch(match.id, { status: "finalised" }, match.status),
     onSuccess: async () => {
       setSaved("Match finalised. It now contributes to scores and prices on the next recompute.");
       await qc.invalidateQueries({ queryKey: ["admin"] });

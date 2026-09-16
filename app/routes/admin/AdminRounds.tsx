@@ -327,7 +327,7 @@ function MatchRow({ match, frozen }: { match: AdminMatch; frozen: boolean }) {
         opponent: draft.opponent,
         status: draft.status,
         finalDayDate: draft.finalDayDate === "" ? null : draft.finalDayDate,
-      }),
+      }, match.status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 
