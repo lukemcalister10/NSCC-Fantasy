@@ -102,6 +102,12 @@ export interface PlayerProfile {
   scores: PlayerScoreRow[];
 }
 
+export interface PlayerSelectionPopularity {
+  selectedCount: number;
+  teamCount: number;
+  percentage: number;
+}
+
 export interface RoundView {
   id: string;
   seq: number;
@@ -348,6 +354,33 @@ export function usePlayer(playerId: string | undefined) {
         currentPrice: current,
         priceHistory,
         scores,
+      };
+    },
+  });
+}
+
+export function usePlayerSelectionPopularity(
+  roundId: string | undefined,
+  playerId: string | undefined,
+) {
+  return useQuery({
+    queryKey: ["player-selection-popularity", roundId, playerId],
+    enabled: !!roundId && !!playerId,
+    staleTime: 15_000,
+    queryFn: async (): Promise<PlayerSelectionPopularity | null> => {
+      const rows = unwrap<{ selected_count: number; team_count: number }[]>(
+        await supabase
+          .from("player_selection_popularity")
+          .select("selected_count,team_count")
+          .eq("round_id", roundId!)
+          .eq("player_id", playerId!),
+      );
+      const row = rows[0];
+      if (!row) return null;
+      return {
+        selectedCount: row.selected_count,
+        teamCount: row.team_count,
+        percentage: row.team_count === 0 ? 0 : (row.selected_count / row.team_count) * 100,
       };
     },
   });
