@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { PlayerRole } from "../../../src/config/types";
 import { money } from "../../lib/format";
 import { PriceMovement } from "../PriceMovement";
 import { RoleBadge } from "../RoleBadge";
+import { PlayerAvatar } from "../PlayerAvatar";
 import { ROLE_ORDER } from "../../lib/squad";
 import type { PoolPlayer } from "../../lib/teamQueries";
 import type { HoldingView } from "../../lib/useTeamState";
@@ -56,6 +58,7 @@ export function SquadTable({
       <table className="table squad-table">
         <thead>
           <tr>
+            <th className="squad-photo-col" aria-label="Player photo" />
             <th>Player</th>
             <th>Role</th>
             <th className="col-num">Bought</th>
@@ -73,9 +76,24 @@ export function SquadTable({
               h.currentPrice !== null ? h.currentPrice - h.purchasePrice : 0;
             return (
               <tr key={h.playerId} className={h.midMatchLocked ? "row-locked" : undefined}>
+                <td className="squad-photo-col">
+                  {h.player ? (
+                    <PlayerAvatar
+                      name={h.player.display_name}
+                      size={40}
+                      photoUrl={h.player.photo_url}
+                    />
+                  ) : null}
+                </td>
                 <td className="team-name">
                   <span className="squad-player">
-                    {h.player?.display_name ?? "—"}
+                    {h.player ? (
+                      <Link to={`/players/${h.player.id}`} className="squad-player-link">
+                        {h.player.display_name}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress
