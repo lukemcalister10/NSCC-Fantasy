@@ -9,6 +9,7 @@ import { PlayerProfile } from "./routes/PlayerProfile";
 import { Rounds } from "./routes/Rounds";
 import { Team } from "./routes/Team";
 import { Trades } from "./routes/Trades";
+import { Help } from "./routes/Help";
 import { AdminHome } from "./routes/admin/AdminHome";
 import { AdminPlayers } from "./routes/admin/AdminPlayers";
 import { AdminRounds } from "./routes/admin/AdminRounds";
@@ -44,6 +45,7 @@ export function App() {
         <Route path="/rounds" element={<Rounds />} />
         <Route path="/team" element={<Team />} />
         <Route path="/team/trades" element={<Trades />} />
+        <Route path="/help" element={<Help />} />
         <Route element={<RequireManager />}>
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/players" element={<AdminPlayers />} />
