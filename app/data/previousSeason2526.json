@@ -305,6 +305,32 @@
       }
     ]
   },
+  "Jonathan Villanueva": {
+    "clubPlayerId": "fe54f44a-bbab-476c-ac00-95f7ffb7af87",
+    "clubName": "Jonathan Villanueva",
+    "seasons": [
+      {
+        "season": "2025/26",
+        "teamName": "2025/26 NCU 5th Grade",
+        "grade": "5th Grade",
+        "association": "Northern Cricket Union",
+        "matches": 9,
+        "innings": 8,
+        "notOuts": 0,
+        "runs": 434,
+        "highScore": 157,
+        "battingAverage": 54.25,
+        "strikeRate": 41,
+        "overs": "27.2",
+        "wickets": 4,
+        "bestBowling": "2/16",
+        "bowlingAverage": 30.25,
+        "economy": 4.43,
+        "catches": 2,
+        "stumpings": 0
+      }
+    ]
+  },
   "Benjamin O'Sullivan": {
     "clubPlayerId": "a27a0824-465a-4743-a82e-c2312c2ceb31",
     "clubName": "Benjamin O'Sullivan",

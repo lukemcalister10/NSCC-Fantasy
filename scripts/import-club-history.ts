@@ -42,6 +42,7 @@ const rosterOverrides: ClubPlayer[] = [
   { id: "8d73c6e9-086c-4c34-b8b5-adf4fa2a2a41", name: "Amit Purbi" },
   { id: "eed61074-054b-4918-b2a1-d932aeb4ade0", name: "Andrew Castellano" },
   { id: "1f406f67-d284-43ec-b778-eecb4e872433", name: "Ralph Amerasinghe" },
+  { id: "fe54f44a-bbab-476c-ac00-95f7ffb7af87", name: "Jonathan Villanueva" },
 ];
 
 function normalise(name: string): string {
@@ -55,11 +56,17 @@ function normalise(name: string): string {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    headers: { "x-app-key": apiKey! },
-  });
-  if (!response.ok) throw new Error(`${path} returned ${response.status}`);
-  return (await response.json()) as T;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: { "x-app-key": apiKey! },
+    });
+    if (response.ok) return (await response.json()) as T;
+    if (response.status < 500 || attempt === 3) {
+      throw new Error(`${path} returned ${response.status}`);
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 500));
+  }
+  throw new Error(`${path} failed after retries`);
 }
 
 function compactSeason(season: ClubSeason): ClubSeason {

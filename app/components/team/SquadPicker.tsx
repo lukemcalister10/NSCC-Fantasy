@@ -70,8 +70,12 @@ export function SquadTable({
             <th className="squad-photo-col" aria-label="Player photo" />
             <th>Player</th>
             <th className="squad-role-col">Role</th>
-            <th className="col-num">Bought</th>
-            <th className="col-num">Current</th>
+            <th className="squad-money-cell">
+              <span className="squad-money-content">Bought</span>
+            </th>
+            <th className="squad-money-cell">
+              <span className="squad-money-content">Current</span>
+            </th>
             {/* Named precisely: this is gain/loss against the PURCHASE price, not
                 the last price step shown on the player list (Standing Rule 2). */}
             <th className="col-num squad-price-change">Price Change</th>
@@ -118,8 +122,12 @@ export function SquadTable({
                     "—"
                   )}
                 </td>
-                <td className="col-num num">{money(h.purchasePrice)}</td>
-                <td className="col-num num">{money(h.currentPrice)}</td>
+                <td className="squad-money-cell num">
+                  <span className="squad-money-content">{money(h.purchasePrice)}</span>
+                </td>
+                <td className="squad-money-cell num">
+                  <span className="squad-money-content">{money(h.currentPrice)}</span>
+                </td>
                 <td className="col-num num squad-price-change">
                   <PriceMovement delta={gain} />
                 </td>
