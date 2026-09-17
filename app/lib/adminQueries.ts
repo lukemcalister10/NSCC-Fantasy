@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import type { LeagueConfig, PlayerRole } from "../../src/config/types";
-import { useSeasonSelection } from "./SeasonSelectionContext";
 import { signPlayerPhotoPaths } from "./playerPhotos";
 
 /**
@@ -33,18 +32,17 @@ export interface AdminSeason {
 }
 
 export function useAdminSeason() {
-  const selectedSeasonId = useSeasonSelection()?.selectedSeasonId ?? null;
   return useQuery({
-    queryKey: ["admin", "season", selectedSeasonId ?? "latest"],
+    queryKey: ["admin", "season", "latest"],
     staleTime: ADMIN_STALE,
     queryFn: async (): Promise<AdminSeason | null> => {
-      let query = supabase
-        .from("seasons")
-        .select("id,name,config,locked_at,created_at");
-      query = selectedSeasonId
-        ? query.eq("id", selectedSeasonId)
-        : query.order("created_at", { ascending: false }).limit(1);
-      const rows = unwrap<AdminSeason[]>(await query);
+      const rows = unwrap<AdminSeason[]>(
+        await supabase
+          .from("seasons")
+          .select("id,name,config,locked_at,created_at")
+          .order("created_at", { ascending: false })
+          .limit(1),
+      );
       return rows[0] ?? null;
     },
   });

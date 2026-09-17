@@ -1,10 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
-import { useIsManager, useSeasons } from "../lib/queries";
-import {
-  SeasonSelectionProvider,
-  useSeasonSelection,
-} from "../lib/SeasonSelectionContext";
+import { useIsManager } from "../lib/queries";
 import logoUrl from "../assets/nscc-logo.avif";
 
 /**
@@ -28,19 +24,10 @@ const ADMIN_NAV = { to: "/admin", label: "Admin", end: false };
  * the shell itself stays clean-modern. Mobile-first: the nav is a horizontal
  * scroll-safe row that widens on larger screens.
  */
-function AppShellContent() {
+export function AppShell() {
   const { session, signOut } = useAuth();
   const email = session?.user?.email ?? "";
   const { data: isManager } = useIsManager();
-  const selection = useSeasonSelection();
-  const seasons = useSeasons(isManager === true);
-  const latestSeason = seasons.data?.[0] ?? null;
-  const selectedSeason = selection?.selectedSeasonId
-    ? seasons.data?.find((season) => season.id === selection.selectedSeasonId) ?? null
-    : latestSeason;
-  const isHistorical = Boolean(
-    selectedSeason && latestSeason && selectedSeason.id !== latestSeason.id,
-  );
   const items = isManager ? [...NAV, ADMIN_NAV] : NAV;
 
   return (
@@ -53,26 +40,6 @@ function AppShellContent() {
               <span className="brand-name">NSCC Fantasy</span>
             </div>
             <div className="topbar-account">
-              {isManager === true && latestSeason ? (
-                <label className="season-picker field">
-                  <span>Season</span>
-                  <select
-                    aria-label="Season"
-                    value={selection?.selectedSeasonId ?? latestSeason.id}
-                    onChange={(event) =>
-                      selection?.setSelectedSeasonId(
-                        event.target.value === latestSeason.id ? null : event.target.value,
-                      )
-                    }
-                  >
-                    {seasons.data?.map((season) => (
-                      <option key={season.id} value={season.id}>
-                        {season.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
               {email ? <span className="account-email" title={email}>{email}</span> : null}
               <button className="btn-ghost" onClick={() => void signOut()}>
                 Sign out
@@ -95,27 +62,9 @@ function AppShellContent() {
           </nav>
         </div>
       </header>
-      {isManager === true && isHistorical && selectedSeason ? (
-        <div className="season-banner admin-banner admin-banner-locked" role="status">
-          <strong>Viewing {selectedSeason.name}</strong>
-          <span>
-            Changes and data shown below apply to this older or test season. Refreshing or
-            signing out returns to the latest season.
-          </span>
-        </div>
-      ) : null}
       <main>
-        <Outlet key={selection?.selectedSeasonId ?? "latest"} />
+        <Outlet />
       </main>
     </div>
-  );
-}
-
-export function AppShell() {
-  const { session } = useAuth();
-  return (
-    <SeasonSelectionProvider key={session?.user.id ?? "signed-out"}>
-      <AppShellContent />
-    </SeasonSelectionProvider>
   );
 }
