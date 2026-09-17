@@ -3,7 +3,6 @@ import { supabase } from "./supabase";
 import { useAuth } from "../auth/AuthProvider";
 import { generateRound } from "../../src/recompute/roundRobin";
 import type { PlayerRole } from "../../src/config/types";
-import { useSeasonSelection } from "./SeasonSelectionContext";
 import { signPlayerPhotoPaths } from "./playerPhotos";
 
 /**
@@ -165,36 +164,19 @@ export function useIsManager() {
 // ── Season (auto-pick the most-recent) ──────────────────────────────────────
 
 export function useSeason() {
-  const selectedSeasonId = useSeasonSelection()?.selectedSeasonId ?? null;
   return useQuery({
-    queryKey: ["season", selectedSeasonId ?? "latest"],
+    queryKey: ["season", "latest"],
     staleTime: STALE,
     queryFn: async (): Promise<Season | null> => {
-      let query = supabase
-        .from("seasons")
-        .select("id,name,locked_at,created_at");
-      query = selectedSeasonId
-        ? query.eq("id", selectedSeasonId)
-        : query.order("created_at", { ascending: false }).limit(1);
-      const rows = unwrap<Season[]>(await query);
-      return rows[0] ?? null;
-    },
-  });
-}
-
-/** Manager chrome only. The caller must keep this disabled until manager=true. */
-export function useSeasons(enabled: boolean) {
-  return useQuery({
-    queryKey: ["seasons"],
-    enabled,
-    staleTime: STALE,
-    queryFn: async (): Promise<Season[]> =>
-      unwrap<Season[]>(
+      const rows = unwrap<Season[]>(
         await supabase
           .from("seasons")
           .select("id,name,locked_at,created_at")
-          .order("created_at", { ascending: false }),
-      ),
+          .order("created_at", { ascending: false })
+          .limit(1),
+      );
+      return rows[0] ?? null;
+    },
   });
 }
 
