@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "seed:generate": "tsx scripts/generate-seed.ts",
     "seed:generate:odd": "tsx scripts/generate-seed-odd.ts",
+    "history:import": "tsx scripts/import-club-history.ts",
     "recompute": "tsx scripts/recompute.ts",
     "test": "vitest run",
     "test:watch": "vitest",

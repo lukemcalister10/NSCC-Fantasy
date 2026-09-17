@@ -583,6 +583,60 @@
   font-style: italic;
 }
 
+/* ── Previous season player context ── */
+.previous-season-list {
+  display: flex;
+  flex-direction: column;
+}
+.previous-season-row {
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border);
+}
+.previous-season-row:last-child {
+  border-bottom: 0;
+}
+.previous-season-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.previous-season-heading h3 {
+  font-size: var(--fs-base);
+}
+.previous-season-heading span {
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+}
+.previous-season-heading strong {
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.previous-season-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+}
+.previous-season-stats div {
+  min-width: 0;
+}
+.previous-season-stats dt {
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+}
+.previous-season-stats dd {
+  margin: 1px 0 0;
+  font-weight: 700;
+}
+@media (max-width: 520px) {
+  .previous-season-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ── Rounds & fixtures ── */
 .round-grid {
   display: grid;
