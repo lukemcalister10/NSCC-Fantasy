@@ -89,14 +89,15 @@ function NamePromptCard({
 
   return (
     <div className="page">
-      <h1 className="page-title">What should everyone call you?</h1>
+      <h1 className="page-title">Enter your real name</h1>
       <div className="card register-card">
-        <h2 className="section-title">Choose your display name</h2>
+        <h2 className="section-title">Your display name</h2>
         <p className="page-sub">
-          Every player in this league can see this name — it appears on the ladder, the
-          leaderboard and beside your team. Right now yours is{" "}
+          Enter your real first and last name, not your fantasy team name. Every player
+          in this league can see it on the ladder, leaderboard and beside your team.
+          Right now yours is{" "}
           <strong>{currentName}</strong>, which is the address you signed in with,
-          because nothing has ever asked you. Pick a name instead.
+          because nothing has ever asked you. Replace it with your name.
         </p>
         {error ? (
           <div className="state error" role="alert">
@@ -109,7 +110,7 @@ function NamePromptCard({
             className="picker-search"
             value={name}
             maxLength={60}
-            placeholder="Your name"
+            placeholder="First and last name"
             aria-label="Display name"
             autoFocus
             onChange={(e) => setName(e.target.value)}
