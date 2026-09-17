@@ -148,6 +148,32 @@ export function SquadTable({
 export interface PickerBlock {
   blocked: boolean;
   reason: string | null;
+  priceUnavailable?: boolean;
+}
+
+export type RoleFilter = PlayerRole | "ALL";
+
+export function PickerRoleFilters({
+  value,
+  onChange,
+}: {
+  value: RoleFilter;
+  onChange: (role: RoleFilter) => void;
+}) {
+  return (
+    <div className="picker-roles" role="group" aria-label="Filter by role">
+      {(["ALL", ...ROLE_ORDER] as const).map((role) => (
+        <button
+          key={role}
+          type="button"
+          className={`picker-role${value === role ? " picker-role-active" : ""}`}
+          onClick={() => onChange(role)}
+        >
+          {role}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -162,6 +188,10 @@ export function PoolPicker({
   blockFor,
   emptyLabel = "No players in the pool.",
   mode = "multi",
+  roleFilter,
+  onRoleFilterChange,
+  showRoleFilters = true,
+  showSearch = true,
 }: {
   pool: PoolPlayer[];
   selectedIds: Set<string>;
@@ -169,9 +199,15 @@ export function PoolPicker({
   blockFor: (player: PoolPlayer) => PickerBlock;
   emptyLabel?: string;
   mode?: "multi" | "single";
+  roleFilter?: RoleFilter;
+  onRoleFilterChange?: (role: RoleFilter) => void;
+  showRoleFilters?: boolean;
+  showSearch?: boolean;
 }) {
-  const [role, setRole] = useState<PlayerRole | "ALL">("ALL");
+  const [internalRole, setInternalRole] = useState<RoleFilter>("ALL");
   const [search, setSearch] = useState("");
+  const role = roleFilter ?? internalRole;
+  const setRole = onRoleFilterChange ?? setInternalRole;
 
   const shown = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -184,28 +220,21 @@ export function PoolPicker({
 
   return (
     <div className="picker">
-      <div className="picker-controls">
-        <div className="picker-roles" role="group" aria-label="Filter by role">
-          {(["ALL", ...ROLE_ORDER] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              className={`picker-role${role === r ? " picker-role-active" : ""}`}
-              onClick={() => setRole(r)}
-            >
-              {r}
-            </button>
-          ))}
+      {showRoleFilters || showSearch ? (
+        <div className="picker-controls">
+          {showRoleFilters ? <PickerRoleFilters value={role} onChange={setRole} /> : null}
+          {showSearch ? (
+            <input
+              className="picker-search"
+              type="search"
+              placeholder="Search players"
+              value={search}
+              aria-label="Search players"
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          ) : null}
         </div>
-        <input
-          className="picker-search"
-          type="search"
-          placeholder="Search players"
-          value={search}
-          aria-label="Search players"
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      ) : null}
 
       {shown.length === 0 ? (
         <p className="round-empty">{emptyLabel}</p>
@@ -231,7 +260,13 @@ export function PoolPicker({
                 >
                   <span className="picker-name">{p.display_name}</span>
                   <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
-                  <span className="picker-price num">{money(p.priceEnteringRound)}</span>
+                  <span
+                    className={`picker-price num${
+                      block.priceUnavailable ? " picker-price-unavailable" : ""
+                    }`}
+                  >
+                    {money(p.priceEnteringRound)}
+                  </span>
                   <PriceMovement delta={p.movement} showValue={false} />
                   <span className="picker-mark" aria-hidden="true">
                     {selected ? "✓" : mode === "single" ? "" : "+"}
