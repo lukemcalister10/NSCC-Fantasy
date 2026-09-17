@@ -66,8 +66,9 @@ export function SquadTable({
             {/* Named precisely: this is gain/loss against the PURCHASE price, not
                 the last price step shown on the player list (Standing Rule 2). */}
             <th className="col-num squad-price-change">Price Change</th>
-            <th className="col-cap">C 2×</th>
-            <th className="col-cap">VC</th>
+            <th className="col-captain-select">
+              Captain (<strong>2x</strong>)
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -113,25 +114,35 @@ export function SquadTable({
                 <td className="col-num num squad-price-change">
                   <PriceMovement delta={gain} />
                 </td>
-                <td className="col-cap">
-                  <input
-                    type="radio"
-                    name="captain"
-                    aria-label={`Captain: ${h.player?.display_name ?? h.playerId}`}
-                    checked={captainId === h.playerId}
-                    disabled={captaincyDisabledReason !== null}
-                    onChange={() => onSetCaptain(h.playerId)}
-                  />
-                </td>
-                <td className="col-cap">
-                  <input
-                    type="radio"
-                    name="vice-captain"
-                    aria-label={`Vice-captain: ${h.player?.display_name ?? h.playerId}`}
-                    checked={viceCaptainId === h.playerId}
-                    disabled={captaincyDisabledReason !== null || captainId === h.playerId}
-                    onChange={() => onSetViceCaptain(h.playerId)}
-                  />
+                <td className="col-captain-select">
+                  <div
+                    className="captain-selector"
+                    role="group"
+                    aria-label={`Captaincy for ${h.player?.display_name ?? h.playerId}`}
+                  >
+                    <button
+                      type="button"
+                      className={`captain-choice${
+                        captainId === h.playerId ? " captain-choice-active" : ""
+                      }`}
+                      aria-pressed={captainId === h.playerId}
+                      disabled={captaincyDisabledReason !== null}
+                      onClick={() => onSetCaptain(h.playerId)}
+                    >
+                      CAPT
+                    </button>
+                    <button
+                      type="button"
+                      className={`captain-choice${
+                        viceCaptainId === h.playerId ? " captain-choice-active" : ""
+                      }`}
+                      aria-pressed={viceCaptainId === h.playerId}
+                      disabled={captaincyDisabledReason !== null || captainId === h.playerId}
+                      onClick={() => onSetViceCaptain(h.playerId)}
+                    >
+                      VICE
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

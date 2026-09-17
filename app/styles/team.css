@@ -140,7 +140,8 @@
 }
 
 /* ── squad table ──────────────────────────────────────────────────────────── */
-.squad-table .col-cap { text-align: center; width: 3rem; }
+.squad-table .col-captain-select { text-align: center; width: 9rem; }
+.squad-table thead .col-captain-select { text-transform: none; }
 .squad-table .squad-photo-col { width: 3.5rem; padding-right: 0; }
 .squad-table th.col-num,
 .squad-table td.col-num { text-align: center; }
@@ -154,6 +155,28 @@
 .squad-player-link { color: var(--ink); font-weight: 700; text-decoration: none; }
 .squad-player-link:hover { color: var(--accent); text-decoration: underline; }
 .squad-player .blocked-reason { padding: 0; }
+.captain-selector {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.captain-choice {
+  min-width: 3.75rem;
+  border: 0;
+  background: var(--surface);
+  color: var(--accent);
+  padding: var(--sp-2) var(--sp-2);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.captain-choice + .captain-choice { border-left: 1px solid var(--accent); }
+.captain-choice-active { background: var(--accent); color: var(--accent-ink); }
+.captain-choice:disabled { cursor: not-allowed; opacity: 0.55; }
+.captain-choice-active:disabled { opacity: 0.8; }
 .table-foot-note {
   font-size: var(--fs-xs);
   color: var(--ink-muted);
