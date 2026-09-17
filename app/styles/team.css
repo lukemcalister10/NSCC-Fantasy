@@ -140,16 +140,23 @@
 }
 
 /* ── squad table ──────────────────────────────────────────────────────────── */
-.squad-table .col-captain-select { text-align: center; width: 9rem; }
+.squad-table {
+  min-width: 58rem;
+  table-layout: fixed;
+}
+.squad-table .squad-photo-column { width: 3.5rem; }
+.squad-table .squad-player-column { width: auto; }
+.squad-table .squad-role-column { width: 5.5rem; }
+.squad-table .squad-money-column { width: 7.5rem; }
+.squad-table .squad-change-column { width: 8rem; }
+.squad-table .squad-captain-column { width: 10rem; }
+.squad-table .col-captain-select { text-align: center; }
 .squad-table thead .col-captain-select { text-transform: none; }
 .squad-table .squad-photo-col { width: 3.5rem; padding-right: 0; }
+.squad-table th.squad-role-col,
+.squad-table td.squad-role-col { text-align: center; }
 .squad-table th.col-num,
 .squad-table td.col-num { text-align: center; }
-.squad-table .squad-price-change {
-  width: 6.5rem;
-  padding-left: 0;
-  padding-right: var(--sp-5);
-}
 .squad-table .row-locked { background: var(--surface-subtle); }
 .squad-player { display: flex; flex-direction: column; gap: 2px; }
 .squad-player-link { color: var(--ink); font-weight: 700; text-decoration: none; }
