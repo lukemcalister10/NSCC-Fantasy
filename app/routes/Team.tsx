@@ -264,6 +264,7 @@ export function Team() {
             captainId={captaincy?.captainId ?? null}
             viceCaptainId={captaincy?.viceCaptainId ?? null}
             captaincyDisabledReason={captaincyDisabledReason}
+            availability={state.availability}
             onSetCaptain={(playerId) =>
               void changeCaptaincy({
                 captainId: playerId,
@@ -479,6 +480,7 @@ function InitialBuild({
         pool={state.pool}
         selectedIds={picked}
         onToggle={toggle}
+        availability={state.availability}
         blockFor={(p) => {
           if (state.midMatchLocked.has(p.id)) {
             return { blocked: true, reason: "🔒 match in progress — cannot be bought (D7/G6)" };

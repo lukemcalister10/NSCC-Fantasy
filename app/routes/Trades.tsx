@@ -28,6 +28,7 @@ import {
   type RoleFilter,
 } from "../components/team/SquadPicker";
 import { RoleBadge } from "../components/RoleBadge";
+import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 import { money } from "../lib/format";
 import type { PoolPlayer } from "../lib/teamQueries";
 import "../styles/team.css";
@@ -268,7 +269,10 @@ export function Trades() {
                     aria-pressed={selected}
                     onClick={() => chooseTradeOut(h.playerId)}
                   >
-                    <span className="picker-name">{h.player?.display_name ?? "—"}</span>
+                    <span className="picker-name">
+                      {h.player?.display_name ?? "—"}{" "}
+                      <PlayerAvailabilityDot status={state.availability.get(h.playerId)} />
+                    </span>
                     {h.player ? (
                       <RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} />
                     ) : null}
@@ -303,6 +307,7 @@ export function Trades() {
             onRoleFilterChange={setRoleFilter}
             showRoleFilters={false}
             showSearch={false}
+            availability={state.availability}
             blockFor={(p) => {
               if (state.midMatchLocked.has(p.id)) {
                 return {

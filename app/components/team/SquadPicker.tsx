@@ -5,6 +5,8 @@ import { money } from "../../lib/format";
 import { PriceMovement } from "../PriceMovement";
 import { RoleBadge } from "../RoleBadge";
 import { PlayerAvatar } from "../PlayerAvatar";
+import { PlayerAvailabilityDot } from "../PlayerAvailabilityDot";
+import type { PlayerAvailabilityStatus } from "../../lib/playerAvailability";
 import { ROLE_ORDER } from "../../lib/squad";
 import type { PoolPlayer } from "../../lib/teamQueries";
 import type { HoldingView } from "../../lib/useTeamState";
@@ -24,6 +26,7 @@ export function SquadTable({
   onSetCaptain,
   onSetViceCaptain,
   captaincyDisabledReason,
+  availability,
 }: {
   holdings: HoldingView[];
   captainId: string | null;
@@ -31,6 +34,7 @@ export function SquadTable({
   onSetCaptain: (playerId: string) => void;
   onSetViceCaptain: (playerId: string) => void;
   captaincyDisabledReason: string | null;
+  availability: Map<string, PlayerAvailabilityStatus>;
 }) {
   const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
   const sortedHoldings = useMemo(
@@ -108,6 +112,7 @@ export function SquadTable({
                     ) : (
                       "—"
                     )}
+                    <PlayerAvailabilityDot status={availability.get(h.playerId)} />
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress
@@ -220,6 +225,7 @@ export function PoolPicker({
   onRoleFilterChange,
   showRoleFilters = true,
   showSearch = true,
+  availability = new Map<string, PlayerAvailabilityStatus>(),
 }: {
   pool: PoolPlayer[];
   selectedIds: Set<string>;
@@ -231,6 +237,7 @@ export function PoolPicker({
   onRoleFilterChange?: (role: RoleFilter) => void;
   showRoleFilters?: boolean;
   showSearch?: boolean;
+  availability?: Map<string, PlayerAvailabilityStatus>;
 }) {
   const [internalRole, setInternalRole] = useState<RoleFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -286,7 +293,9 @@ export function PoolPicker({
                   aria-pressed={selected}
                   onClick={() => onToggle(p.id)}
                 >
-                  <span className="picker-name">{p.display_name}</span>
+                  <span className="picker-name">
+                    {p.display_name} <PlayerAvailabilityDot status={availability.get(p.id)} />
+                  </span>
                   <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
                   <span
                     className={`picker-price num${
