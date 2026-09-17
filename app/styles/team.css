@@ -157,6 +157,9 @@
 .squad-table td.squad-role-col { text-align: center; }
 .squad-table th.col-num,
 .squad-table td.col-num { text-align: center; }
+/* The global numeric-heading rule is more specific and otherwise leaves these
+   headings right-aligned above centred values. */
+.squad-table thead th.col-num { text-align: center; }
 .squad-table .row-locked { background: var(--surface-subtle); }
 .squad-player { display: flex; flex-direction: column; gap: 2px; }
 .squad-player-link { color: var(--ink); font-weight: 700; text-decoration: none; }

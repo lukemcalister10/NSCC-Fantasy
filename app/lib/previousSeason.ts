@@ -29,7 +29,31 @@ interface PreviousSeasonPlayer {
 
 const byRegistryName = history as Record<string, PreviousSeasonPlayer>;
 
+function seasonLineOrder(line: PreviousSeasonLine): number {
+  const grade = line.grade.toLowerCase();
+  const association = line.association.toLowerCase();
+  if (grade.includes("3rd")) return 0;
+  if (grade.includes("5th") && association.includes("northern")) return 1;
+  if (
+    grade.includes("5th") &&
+    (association.includes("manly") || association.includes("mwca"))
+  ) {
+    return 2;
+  }
+  return 3;
+}
+
 /** Historical names stay stable even when the shorter customer-facing name changes. */
 export function previousSeasonFor(registryKey: string): PreviousSeasonPlayer | null {
-  return byRegistryName[registryKey] ?? null;
+  const player = byRegistryName[registryKey];
+  if (!player) return null;
+  return {
+    ...player,
+    seasons: [...player.seasons].sort(
+      (a, b) =>
+        seasonLineOrder(a) - seasonLineOrder(b) ||
+        a.grade.localeCompare(b.grade) ||
+        a.association.localeCompare(b.association),
+    ),
+  };
 }
