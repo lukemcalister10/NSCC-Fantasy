@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import { useAuth } from "../auth/AuthProvider";
 import type { LeagueConfig, PlayerRole } from "../../src/config/types";
+import { signPlayerPhotoPaths } from "./playerPhotos";
 import {
   latestPrice,
   priceEnteringRound,
@@ -274,6 +275,8 @@ export interface PoolPlayer {
   role: PlayerRole;
   wk_eligible: boolean;
   starting_price: number | null;
+  photo_path: string | null;
+  photo_url: string | null;
   /** Most recent price on record — what the player list shows. */
   latestPrice: number | null;
   /**
@@ -306,19 +309,21 @@ export function usePool(
         role: PlayerRole;
         wk_eligible: boolean;
         starting_price: number | null;
+        photo_path: string | null;
         price_history: PricePoint[];
       }
       const rows = unwrap<Row[]>(
         await supabase
           .from("players")
           .select(
-            "id,display_name,role,wk_eligible,starting_price,price_history(seq,price,match_id)",
+            "id,display_name,role,wk_eligible,starting_price,photo_path,price_history(seq,price,match_id)",
           )
           .eq("season_id", seasonId!)
           .eq("active", true)
           .order("display_name"),
       );
 
+      const photoUrls = await signPlayerPhotoPaths(rows.map((p) => p.photo_path));
       return rows.map((p) => {
         const history = p.price_history ?? [];
         const latest = latestPrice(history) ?? p.starting_price;
@@ -333,6 +338,8 @@ export function usePool(
           role: p.role,
           wk_eligible: p.wk_eligible,
           starting_price: p.starting_price,
+          photo_path: p.photo_path,
+          photo_url: p.photo_path ? (photoUrls.get(p.photo_path) ?? null) : null,
           latestPrice: latest,
           priceEnteringRound: entering,
           movement: priceMovement(history),
