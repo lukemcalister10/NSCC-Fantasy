@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { usePlayer, type PlayerProfile as Profile } from "../lib/queries";
+import { usePlayer, useSeason, type PlayerProfile as Profile } from "../lib/queries";
 import { RoleBadge } from "../components/RoleBadge";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { PriceMovement } from "../components/PriceMovement";
@@ -7,6 +7,9 @@ import { BroadcastPanel } from "../components/BroadcastPanel";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { money, shortDate } from "../lib/format";
 import { previousSeasonFor, type PreviousSeasonLine } from "../lib/previousSeason";
+import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
+import { usePlayerAvailability } from "../lib/playerAvailability";
+import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 
 /** Minimal, dependency-free sparkline of the price path (seq order). */
 function PriceSparkline({ prices }: { prices: number[] }) {
@@ -85,6 +88,10 @@ function PreviousSeasonStats({ lines }: { lines: PreviousSeasonLine[] }) {
 export function PlayerProfile() {
   const { id } = useParams<{ id: string }>();
   const query = usePlayer(id);
+  const season = useSeason();
+  const rounds = useSeasonRounds(season.data?.id);
+  const activeRound = activeRoundOf(rounds.data);
+  const availability = usePlayerAvailability(activeRound?.id);
 
   if (query.isLoading) return <Loading />;
   if (query.error) return <ErrorState error={query.error} />;
@@ -113,7 +120,9 @@ export function PlayerProfile() {
       <div className="profile-head card">
         <PlayerAvatar name={p.display_name} size={72} photoUrl={p.photo_url} />
         <div className="profile-id">
-          <h1 className="profile-name">{p.display_name}</h1>
+          <h1 className="profile-name">
+            {p.display_name} <PlayerAvailabilityDot status={availability.data?.get(p.id)} />
+          </h1>
           <div className="profile-role">
             <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
           </div>

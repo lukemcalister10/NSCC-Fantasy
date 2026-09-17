@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminPage, Section, SeasonLockBanner, StatusLine, Field } from "./adminChrome";
-import { useAdminSeason, useAdminPlayers, useRegistryEvents } from "../../lib/adminQueries";
+import { useAdminSeason, useAdminPlayers, useAdminRounds, useRegistryEvents } from "../../lib/adminQueries";
 import type { AdminPlayer } from "../../lib/adminQueries";
 import {
   createPlayer,
@@ -19,6 +19,13 @@ import { money, shortDate } from "../../lib/format";
 import { parseRegistrySeed, type SeedRow } from "../../../src/registry/csvImport";
 import { normaliseName } from "../../../src/registry/nameNormalisation";
 import type { PlayerRole } from "../../../src/config/types";
+import { activeRoundOf } from "../../lib/teamQueries";
+import {
+  setPlayerAvailability,
+  usePlayerAvailability,
+  type PlayerAvailabilityStatus,
+} from "../../lib/playerAvailability";
+import { PlayerAvailabilityDot } from "../../components/PlayerAvailabilityDot";
 
 const ROLES: PlayerRole[] = ["BAT", "WK", "BWL", "AR"];
 
@@ -38,6 +45,8 @@ export function AdminPlayers() {
   const season = useAdminSeason();
   const seasonId = season.data?.id;
   const players = useAdminPlayers(seasonId);
+  const rounds = useAdminRounds(seasonId);
+  const activeRound = activeRoundOf(rounds.data);
   const events = useRegistryEvents(seasonId, 12);
   const locked = !!season.data?.locked_at;
 
@@ -57,6 +66,11 @@ export function AdminPlayers() {
       intro={`${season.data.name} · ${players.data?.length ?? 0} players`}
     >
       <SeasonLockBanner lockedAt={season.data.locked_at} />
+
+      <AvailabilityManager
+        round={activeRound}
+        players={(players.data ?? []).filter((player) => player.active)}
+      />
 
       <Section title={locked ? "Add a player mid-season" : "Add a player"}>
         <AddPlayerForm
@@ -128,6 +142,98 @@ export function AdminPlayers() {
         )}
       </Section>
     </AdminPage>
+  );
+}
+
+function AvailabilityManager({
+  round,
+  players,
+}: {
+  round: { id: string; name: string; lock_at: string } | null;
+  players: AdminPlayer[];
+}) {
+  const qc = useQueryClient();
+  const availability = usePlayerAvailability(round?.id);
+  const mutation = useMutation({
+    mutationFn: ({
+      playerId,
+      status,
+    }: {
+      playerId: string;
+      status: PlayerAvailabilityStatus | null;
+    }) => setPlayerAvailability(round!.id, playerId, status),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["player-availability", round?.id] }),
+  });
+
+  if (!round) {
+    return (
+      <Section title="Player availability">
+        <p className="admin-help">Every round has locked. Availability is closed.</p>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title={`Player availability · ${round.name}`}>
+      <p className="admin-help">
+        Green means playing, red means not playing, and no dot means not set. These
+        indicators clear automatically when this round locks.
+      </p>
+      {availability.error ? <ErrorState error={availability.error} /> : null}
+      {mutation.error ? <ErrorState error={mutation.error} /> : null}
+      <div className="card table-card">
+        <table className="table availability-admin-table">
+          <thead>
+            <tr><th>Player</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {players.map((player) => {
+              const current = availability.data?.get(player.id);
+              const pending = mutation.isPending && mutation.variables?.playerId === player.id;
+              const set = (status: PlayerAvailabilityStatus | null) =>
+                mutation.mutate({ playerId: player.id, status });
+              return (
+                <tr key={player.id}>
+                  <td>
+                    <span className="availability-admin-name">
+                      <PlayerAvatar name={player.display_name} size={32} photoUrl={player.photo_url} />
+                      <strong>{player.display_name}</strong>
+                      <PlayerAvailabilityDot status={current} />
+                    </span>
+                  </td>
+                  <td>
+                    <div className="availability-controls" role="group" aria-label={`${player.display_name} availability`}>
+                      <button
+                        type="button"
+                        className={`availability-choice availability-choice-available${current === "available" ? " availability-choice-active" : ""}`}
+                        aria-pressed={current === "available"}
+                        disabled={pending}
+                        onClick={() => set("available")}
+                      >Playing</button>
+                      <button
+                        type="button"
+                        className={`availability-choice availability-choice-unavailable${current === "unavailable" ? " availability-choice-active" : ""}`}
+                        aria-pressed={current === "unavailable"}
+                        disabled={pending}
+                        onClick={() => set("unavailable")}
+                      >Not playing</button>
+                      <button
+                        type="button"
+                        className={`availability-choice${current === undefined ? " availability-choice-active" : ""}`}
+                        aria-pressed={current === undefined}
+                        disabled={pending}
+                        onClick={() => set(null)}
+                      >Clear</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
   );
 }
 

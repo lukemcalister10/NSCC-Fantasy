@@ -27,6 +27,7 @@ import {
   type TradeBudget,
   type TradeRow,
 } from "./squad";
+import { usePlayerAvailability, type PlayerAvailabilityStatus } from "./playerAvailability";
 
 /**
  * The assembled team state both /team and /team/trades read from. One place
@@ -77,6 +78,7 @@ export interface TeamState {
   pool: PoolPlayer[];
   poolById: Map<string, PoolPlayer>;
   midMatchLocked: Set<string>;
+  availability: Map<string, PlayerAvailabilityStatus>;
 
   holdings: HoldingView[];
   capRemaining: number | null;
@@ -111,6 +113,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
   const selectionsQ = useTeamSelections(teamId);
   const poolQ = usePool(seasonId, roundsQ.data, activeRound?.seq);
   const lockedQ = useMidMatchLockedPlayers(roundsQ.data);
+  const availabilityQ = usePlayerAvailability(activeRound?.id);
 
   const pool = useMemo(() => poolQ.data ?? [], [poolQ.data]);
   const poolById = useMemo(() => new Map(pool.map((p) => [p.id, p])), [pool]);
@@ -177,6 +180,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     (selectionsQ.error as Error | null) ??
     (poolQ.error as Error | null) ??
     (lockedQ.error as Error | null) ??
+    (availabilityQ.error as Error | null) ??
     null;
 
   return {
@@ -185,6 +189,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
       roundsQ.isLoading ||
       teamQ.isLoading ||
       poolQ.isLoading ||
+      (!!activeRound && availabilityQ.isLoading) ||
       (!!teamId && (tradesQ.isLoading || selectionsQ.isLoading)),
     error,
     seasonId,
@@ -204,6 +209,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     pool,
     poolById,
     midMatchLocked,
+    availability: availabilityQ.data ?? new Map<string, PlayerAvailabilityStatus>(),
     holdings: holdingViews,
     capRemaining,
     investedValue,
@@ -215,6 +221,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
       void qc.invalidateQueries({ queryKey: ["team-selections"] });
       void qc.invalidateQueries({ queryKey: ["my-team"] });
       void qc.invalidateQueries({ queryKey: ["team-pool"] });
+      void qc.invalidateQueries({ queryKey: ["player-availability"] });
     },
   };
 }

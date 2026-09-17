@@ -6,6 +6,9 @@ import { PriceMovement } from "../components/PriceMovement";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { money } from "../lib/format";
+import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
+import { usePlayerAvailability } from "../lib/playerAvailability";
+import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 
 type Sort = "price" | "name" | "role";
 
@@ -32,6 +35,9 @@ function sortPlayers(rows: PlayerListItem[], sort: Sort): PlayerListItem[] {
 export function Players() {
   const season = useSeason();
   const players = usePlayers(season.data?.id);
+  const rounds = useSeasonRounds(season.data?.id);
+  const activeRound = activeRoundOf(rounds.data);
+  const availability = usePlayerAvailability(activeRound?.id);
   const [sort, setSort] = useState<Sort>("price");
 
   const rows = useMemo(
@@ -75,7 +81,9 @@ export function Players() {
             <Link key={p.id} to={`/players/${p.id}`} className="player-row">
               <PlayerAvatar name={p.display_name} size={40} photoUrl={p.photo_url} />
               <div className="player-main">
-                <span className="player-name">{p.display_name}</span>
+                <span className="player-name">
+                  {p.display_name} <PlayerAvailabilityDot status={availability.data?.get(p.id)} />
+                </span>
                 <span className="player-meta">
                   <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
                   <span className="player-start">
