@@ -6,7 +6,12 @@ import {
   translateRefusal,
   type Refusal,
 } from "../lib/teamMutations";
-import { validateComposition, type Holding, type RoleCarrier } from "../lib/squad";
+import {
+  roleCounts,
+  validateComposition,
+  type Holding,
+  type RoleCarrier,
+} from "../lib/squad";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import {
   CapStrip,
@@ -17,7 +22,11 @@ import {
   TeamTabs,
   TradeBudgetNotice,
 } from "../components/team/TeamChrome";
-import { PoolPicker } from "../components/team/SquadPicker";
+import {
+  PickerRoleFilters,
+  PoolPicker,
+  type RoleFilter,
+} from "../components/team/SquadPicker";
 import { RoleBadge } from "../components/RoleBadge";
 import { money } from "../lib/format";
 import type { PoolPlayer } from "../lib/teamQueries";
@@ -47,6 +56,7 @@ export function Trades() {
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
 
   const squad = state.config?.squad;
 
@@ -182,6 +192,27 @@ export function Trades() {
       p.priceEnteringRound !== p.latestPrice,
   );
 
+  const chooseTradeOut = (playerId: string) => {
+    if (sellId === playerId) {
+      setSellId(null);
+      setRoleFilter("ALL");
+      return;
+    }
+
+    const player = state.poolById.get(playerId);
+    const carriers = state.holdings
+      .map((holding) => state.poolById.get(holding.playerId))
+      .filter((candidate): candidate is PoolPlayer => !!candidate);
+    const counts = roleCounts(carriers);
+    const isFlexPlayer = player
+      ? counts[player.role] > (squad.roleMinimums[player.role] ?? 0)
+      : false;
+
+    setSellId(playerId);
+    setBuyId(null);
+    setRoleFilter(player && !isFlexPlayer ? player.role : "ALL");
+  };
+
   return (
     <div className="page">
       <h1 className="page-title">Trades</h1>
@@ -213,9 +244,12 @@ export function Trades() {
       />
 
       <div className="trade-grid">
-        <section className="trade-side">
+        <div className="trade-role-controls">
+          <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
+        </div>
+
+        <section className="trade-side trade-out-side">
           <h2 className="section-title">Trade out</h2>
-          <div className="trade-toolbar-spacer" aria-hidden="true" />
           <ul className="picker-list">
             {state.holdings.map((h) => {
               const selected = sellId === h.playerId;
@@ -232,7 +266,7 @@ export function Trades() {
                     className="picker-button"
                     disabled={locked}
                     aria-pressed={selected}
-                    onClick={() => setSellId(selected ? null : h.playerId)}
+                    onClick={() => chooseTradeOut(h.playerId)}
                   >
                     <span className="picker-name">{h.player?.display_name ?? "—"}</span>
                     {h.player ? (
@@ -255,7 +289,7 @@ export function Trades() {
           </ul>
         </section>
 
-        <section className="trade-side">
+        <section className="trade-side trade-in-side">
           <h2 className="section-title">Trade in</h2>
           <PoolPicker
             mode="single"
@@ -265,6 +299,10 @@ export function Trades() {
             selectedIds={new Set(buyId ? [buyId] : [])}
             onToggle={(id) => setBuyId(buyId === id ? null : id)}
             emptyLabel="No available players."
+            roleFilter={roleFilter}
+            onRoleFilterChange={setRoleFilter}
+            showRoleFilters={false}
+            showSearch={false}
             blockFor={(p) => {
               if (state.midMatchLocked.has(p.id)) {
                 return {
@@ -273,7 +311,7 @@ export function Trades() {
                 };
               }
               if (sell && (state.capRemaining ?? 0) + sellPrice - (p.priceEnteringRound ?? 0) < 0) {
-                return { blocked: true, reason: "Not enough cap, even after the sale." };
+                return { blocked: true, reason: null, priceUnavailable: true };
               }
               return { blocked: false, reason: null };
             }}

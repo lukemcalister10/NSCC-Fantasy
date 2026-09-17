@@ -220,6 +220,12 @@
 .picker-button:disabled { cursor: not-allowed; color: var(--ink-faint); }
 .picker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-price { font-family: var(--font-num); }
+.picker-price-unavailable {
+  color: var(--down);
+  font-weight: 700;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
 .picker-mark { text-align: center; color: var(--accent); font-weight: 700; }
 
 /* ── build / trade layout ─────────────────────────────────────────────────── */
@@ -247,15 +253,31 @@
 .trade-grid {
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-areas:
+    "out"
+    "filters"
+    "in";
   gap: var(--sp-4);
   margin-bottom: var(--sp-4);
 }
 @media (min-width: 800px) {
-  .trade-grid { grid-template-columns: 1fr 1fr; }
+  .trade-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      ". filters"
+      "out in";
+  }
 }
 .trade-side { min-width: 0; }
 .trade-side > .picker { margin-top: 0; }
-.trade-toolbar-spacer { min-height: 2.25rem; margin-bottom: var(--sp-3); }
+.trade-out-side { grid-area: out; }
+.trade-in-side { grid-area: in; }
+.trade-role-controls { grid-area: filters; }
+.trade-side .picker-list {
+  height: calc(9 * 3rem + 2px);
+  max-height: calc(9 * 3rem + 2px);
+}
+.trade-side .picker-button { min-height: 3rem; }
 .trade-summary { padding: var(--sp-4); }
 .trade-line { font-size: var(--fs-sm); margin: 0 0 var(--sp-2); }
 
