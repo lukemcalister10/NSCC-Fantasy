@@ -13,6 +13,7 @@ const NAV = [
   { to: "/players", label: "Players", end: false },
   { to: "/rounds", label: "Rounds", end: false },
   { to: "/team", label: "My Team", end: false },
+  { to: "/help", label: "Help", end: false },
 ];
 
 /** Manager-only entry. Hiding it is cosmetic; RLS (0004) is the boundary (G13). */
