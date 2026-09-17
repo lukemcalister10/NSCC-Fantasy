@@ -13,6 +13,8 @@ import { removePlayerFromPool, explainLockError } from "../../lib/seasonLockMuta
 import { isPoolRemovalAllowed } from "../../lib/seasonLock";
 import { Loading, ErrorState, EmptyState } from "../../components/states";
 import { RoleBadge } from "../../components/RoleBadge";
+import { PlayerAvatar } from "../../components/PlayerAvatar";
+import { uploadPlayerPhoto, removePlayerPhoto } from "../../lib/playerPhotos";
 import { money, shortDate } from "../../lib/format";
 import { parseRegistrySeed, type SeedRow } from "../../../src/registry/csvImport";
 import { normaliseName } from "../../../src/registry/nameNormalisation";
@@ -81,6 +83,7 @@ export function AdminPlayers() {
               <thead>
                 <tr>
                   <th>Player</th>
+                  <th>Photo</th>
                   <th>Role</th>
                   <th>WK elig.</th>
                   <th className="col-num">Starting price</th>
@@ -90,7 +93,12 @@ export function AdminPlayers() {
               </thead>
               <tbody>
                 {players.data!.map((p) => (
-                  <PlayerRow key={p.id} player={p} locked={locked} />
+                  <PlayerRow
+                    key={p.id}
+                    player={p}
+                    seasonId={season.data!.id}
+                    locked={locked}
+                  />
                 ))}
               </tbody>
             </table>
@@ -245,8 +253,17 @@ function AddPlayerForm({
 
 // ── Registry row (inline edit) ──────────────────────────────────────────────
 
-function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean }) {
+function PlayerRow({
+  player,
+  seasonId,
+  locked,
+}: {
+  player: AdminPlayer;
+  seasonId: string;
+  locked: boolean;
+}) {
   const qc = useQueryClient();
+  const photoInput = useRef<HTMLInputElement>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [draft, setDraft] = useState({
     displayName: player.display_name,
@@ -298,6 +315,22 @@ function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean })
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 
+  const photo = useMutation({
+    mutationFn: (file: File) =>
+      uploadPlayerPhoto({
+        seasonId,
+        playerId: player.id,
+        currentPath: player.photo_path,
+        file,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
+  });
+
+  const removePhoto = useMutation({
+    mutationFn: () => removePlayerPhoto(player.id, player.photo_path!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
+  });
+
   return (
     <tr>
       <td className="tight">
@@ -305,6 +338,45 @@ function PlayerRow({ player, locked }: { player: AdminPlayer; locked: boolean })
           value={draft.displayName}
           onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
         />
+      </td>
+      <td className="tight">
+        <div className="admin-photo-cell">
+          <PlayerAvatar name={player.display_name} size={40} photoUrl={player.photo_url} />
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) photo.mutate(file);
+            }}
+          />
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={photo.isPending || removePhoto.isPending}
+            onClick={() => photoInput.current?.click()}
+          >
+            {photo.isPending ? "Uploading…" : player.photo_path ? "Replace" : "Add photo"}
+          </button>
+          {player.photo_path ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={photo.isPending || removePhoto.isPending}
+              onClick={() => removePhoto.mutate()}
+            >
+              {removePhoto.isPending ? "Removing…" : "Remove photo"}
+            </button>
+          ) : null}
+        </div>
+        {photo.error || removePhoto.error ? (
+          <div className="admin-status admin-status-error">
+            {explainWriteError(photo.error ?? removePhoto.error)}
+          </div>
+        ) : null}
       </td>
       <td className="tight">
         {locked ? (

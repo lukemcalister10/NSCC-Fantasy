@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { generateRound } from "../../src/recompute/roundRobin";
 import type { PlayerRole } from "../../src/config/types";
 import { useSeasonSelection } from "./SeasonSelectionContext";
+import { signPlayerPhotoPaths } from "./playerPhotos";
 
 /**
  * Read layer. Every hook is a plain `supabase.from(...).select(...)` under the
@@ -62,6 +63,8 @@ export interface PlayerListItem {
   role: PlayerRole;
   wk_eligible: boolean;
   starting_price: number | null;
+  photo_path: string | null;
+  photo_url: string | null;
   currentPrice: number | null;
   movement: number; // current − previous (0 if only the seed exists)
 }
@@ -92,6 +95,8 @@ export interface PlayerProfile {
   role: PlayerRole;
   wk_eligible: boolean;
   starting_price: number | null;
+  photo_path: string | null;
+  photo_url: string | null;
   currentPrice: number | null;
   priceHistory: PricePoint[];
   scores: PlayerScoreRow[];
@@ -244,6 +249,7 @@ interface PlayerWithPrices {
   role: PlayerRole;
   wk_eligible: boolean;
   starting_price: number | null;
+  photo_path: string | null;
   price_history: { seq: number; price: number }[];
 }
 
@@ -268,12 +274,13 @@ export function usePlayers(seasonId: string | undefined) {
         await supabase
           .from("players")
           .select(
-            "id,display_name,role,wk_eligible,starting_price,price_history(seq,price)",
+            "id,display_name,role,wk_eligible,starting_price,photo_path,price_history(seq,price)",
           )
           .eq("season_id", seasonId!)
           .eq("active", true)
           .order("display_name"),
       );
+      const photoUrls = await signPlayerPhotoPaths(rows.map((p) => p.photo_path));
       return rows.map((p) => {
         const { current, movement } = latestAndMovement(p.price_history ?? []);
         return {
@@ -282,6 +289,8 @@ export function usePlayers(seasonId: string | undefined) {
           role: p.role,
           wk_eligible: p.wk_eligible,
           starting_price: p.starting_price,
+          photo_path: p.photo_path,
+          photo_url: p.photo_path ? (photoUrls.get(p.photo_path) ?? null) : null,
           currentPrice: current ?? p.starting_price,
           movement,
         };
@@ -306,10 +315,11 @@ export function usePlayer(playerId: string | undefined) {
         role: PlayerRole;
         wk_eligible: boolean;
         starting_price: number | null;
+        photo_path: string | null;
       }>(
         await supabase
           .from("players")
-          .select("id,display_name,role,wk_eligible,starting_price")
+          .select("id,display_name,role,wk_eligible,starting_price,photo_path")
           .eq("id", playerId!)
           .eq("season_id", seasonId!)
           .single(),
@@ -342,9 +352,11 @@ export function usePlayer(playerId: string | undefined) {
         priceHistory.length > 0
           ? priceHistory[priceHistory.length - 1]!.price
           : player.starting_price;
+      const photoUrls = await signPlayerPhotoPaths([player.photo_path]);
 
       return {
         ...player,
+        photo_url: player.photo_path ? (photoUrls.get(player.photo_path) ?? null) : null,
         currentPrice: current,
         priceHistory,
         scores,

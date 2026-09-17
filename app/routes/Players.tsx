@@ -73,7 +73,7 @@ export function Players() {
         <div className="card player-list">
           {rows.map((p) => (
             <Link key={p.id} to={`/players/${p.id}`} className="player-row">
-              <PlayerAvatar name={p.display_name} size={40} />
+              <PlayerAvatar name={p.display_name} size={40} photoUrl={p.photo_url} />
               <div className="player-main">
                 <span className="player-name">{p.display_name}</span>
                 <span className="player-meta">
