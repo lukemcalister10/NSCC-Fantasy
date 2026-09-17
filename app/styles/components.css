@@ -519,6 +519,63 @@
   font-size: var(--fs-lg);
   font-weight: 700;
 }
+
+.player-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: rgb(11 25 49 / 58%);
+  overflow-y: auto;
+}
+.player-modal {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 2 * var(--sp-4));
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
+  outline: none;
+}
+.player-modal-close {
+  position: sticky;
+  top: var(--sp-3);
+  z-index: 2;
+  float: right;
+  width: 36px;
+  height: 36px;
+  margin: var(--sp-3) var(--sp-3) calc(-1 * (36px + var(--sp-3))) 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.player-modal-close:hover,
+.player-modal-close:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.player-profile-page-modal {
+  padding-top: var(--sp-5);
+}
+
+@media (max-width: 600px) {
+  .player-modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+  .player-modal {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}
 .profile-role {
   margin-top: var(--sp-2);
 }

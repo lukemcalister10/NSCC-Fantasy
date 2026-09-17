@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useSeason, usePlayers, type PlayerListItem } from "../lib/queries";
 import { RoleBadge } from "../components/RoleBadge";
 import { PriceMovement } from "../components/PriceMovement";
@@ -33,6 +33,7 @@ function sortPlayers(rows: PlayerListItem[], sort: Sort): PlayerListItem[] {
  * last − previous); rows link to the player profile.
  */
 export function Players() {
+  const location = useLocation();
   const season = useSeason();
   const players = usePlayers(season.data?.id);
   const rounds = useSeasonRounds(season.data?.id);
@@ -78,7 +79,12 @@ export function Players() {
       ) : (
         <div className="card player-list">
           {rows.map((p) => (
-            <Link key={p.id} to={`/players/${p.id}`} className="player-row">
+            <Link
+              key={p.id}
+              to={`/players/${p.id}`}
+              state={{ backgroundLocation: location }}
+              className="player-row"
+            >
               <PlayerAvatar name={p.display_name} size={40} photoUrl={p.photo_url} />
               <div className="player-main">
                 <span className="player-name">

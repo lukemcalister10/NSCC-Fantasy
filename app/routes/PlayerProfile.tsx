@@ -90,7 +90,7 @@ function PreviousSeasonStats({ lines }: { lines: PreviousSeasonLine[] }) {
   );
 }
 
-export function PlayerProfile() {
+export function PlayerProfile({ modal = false }: { modal?: boolean }) {
   const { id } = useParams<{ id: string }>();
   const query = usePlayer(id);
   const season = useSeason();
@@ -120,10 +120,12 @@ export function PlayerProfile() {
   const previousSeason = previousSeasonFor(p.registry_key);
 
   return (
-    <div className="page">
-      <Link to="/players" className="back-link">
-        ← All players
-      </Link>
+    <div className={`page player-profile-page${modal ? " player-profile-page-modal" : ""}`}>
+      {!modal ? (
+        <Link to="/players" className="back-link">
+          ← All players
+        </Link>
+      ) : null}
 
       <div className="profile-head card">
         <PlayerAvatar name={p.display_name} size={72} photoUrl={p.photo_url} />
