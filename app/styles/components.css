@@ -449,6 +449,12 @@
 .avatar-monogram {
   letter-spacing: 0.02em;
 }
+.admin-photo-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 14rem;
+}
 
 /* ── Player list (SuperCoach density) ── */
 .player-list {

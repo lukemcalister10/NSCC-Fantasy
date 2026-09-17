@@ -74,7 +74,7 @@ export function PlayerProfile() {
       </Link>
 
       <div className="profile-head card">
-        <PlayerAvatar name={p.display_name} size={72} />
+        <PlayerAvatar name={p.display_name} size={72} photoUrl={p.photo_url} />
         <div className="profile-id">
           <h1 className="profile-name">{p.display_name}</h1>
           <div className="profile-role">

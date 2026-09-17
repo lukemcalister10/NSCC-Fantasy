@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import type { LeagueConfig, PlayerRole } from "../../src/config/types";
 import { useSeasonSelection } from "./SeasonSelectionContext";
+import { signPlayerPhotoPaths } from "./playerPhotos";
 
 /**
  * MANAGER-BACKEND READS. Same anon client, same RLS (0004) — a manager is just an
@@ -59,6 +60,8 @@ export interface AdminPlayer {
   wk_eligible: boolean;
   starting_price: number | null;
   active: boolean;
+  photo_path: string | null;
+  photo_url: string | null;
 }
 
 export function useAdminPlayers(seasonId: string | undefined) {
@@ -66,14 +69,20 @@ export function useAdminPlayers(seasonId: string | undefined) {
     queryKey: ["admin", "players", seasonId],
     enabled: !!seasonId,
     staleTime: ADMIN_STALE,
-    queryFn: async (): Promise<AdminPlayer[]> =>
-      unwrap<AdminPlayer[]>(
+    queryFn: async (): Promise<AdminPlayer[]> => {
+      const rows = unwrap<Omit<AdminPlayer, "photo_url">[]>(
         await supabase
           .from("players")
-          .select("id,registry_key,display_name,role,wk_eligible,starting_price,active")
+          .select("id,registry_key,display_name,role,wk_eligible,starting_price,active,photo_path")
           .eq("season_id", seasonId!)
           .order("display_name"),
-      ),
+      );
+      const photoUrls = await signPlayerPhotoPaths(rows.map((p) => p.photo_path));
+      return rows.map((p) => ({
+        ...p,
+        photo_url: p.photo_path ? (photoUrls.get(p.photo_path) ?? null) : null,
+      }));
+    },
   });
 }
 
