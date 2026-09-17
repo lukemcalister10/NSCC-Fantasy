@@ -56,18 +56,27 @@ export function SquadTable({
   return (
     <div className="card table-card">
       <table className="table squad-table">
+        <colgroup>
+          <col className="squad-photo-column" />
+          <col className="squad-player-column" />
+          <col className="squad-role-column" />
+          <col className="squad-money-column" />
+          <col className="squad-money-column" />
+          <col className="squad-change-column" />
+          <col className="squad-captain-column" />
+        </colgroup>
         <thead>
           <tr>
             <th className="squad-photo-col" aria-label="Player photo" />
             <th>Player</th>
-            <th>Role</th>
+            <th className="squad-role-col">Role</th>
             <th className="col-num">Bought</th>
             <th className="col-num">Current</th>
             {/* Named precisely: this is gain/loss against the PURCHASE price, not
                 the last price step shown on the player list (Standing Rule 2). */}
             <th className="col-num squad-price-change">Price Change</th>
             <th className="col-captain-select">
-              Captain (<strong>2x</strong>)
+              CAPTAIN (<strong>2x</strong>)
             </th>
           </tr>
         </thead>
@@ -102,7 +111,7 @@ export function SquadTable({
                     ) : null}
                   </span>
                 </td>
-                <td>
+                <td className="squad-role-col">
                   {h.player ? (
                     <RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} />
                   ) : (
