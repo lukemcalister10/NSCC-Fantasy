@@ -42,10 +42,10 @@ function Scoring({ scoring }: { scoring: ScoringConfig }) {
           title="Batting"
           rows={[
             ["Run", scoring.perRun],
-            ["Four (plus the runs)", scoring.perFour],
-            ["Six (plus the runs)", scoring.perSix],
-            ["50 in an innings", scoring.perFifty],
-            ["100 in an innings (replaces the 50 bonus)", scoring.perCentury],
+            ["Four bonus", scoring.perFour],
+            ["Six bonus", scoring.perSix],
+            ["50 bonus", scoring.perFifty],
+            ["100 bonus (replaces 50)", scoring.perCentury],
             ["Duck", scoring.perDuck],
             ["Not out", scoring.perNotOut],
           ]}
@@ -55,7 +55,7 @@ function Scoring({ scoring }: { scoring: ScoringConfig }) {
           rows={[
             ["Wicket", scoring.perWicket],
             ["Maiden over", scoring.perMaiden],
-            ["Five wickets in an innings", scoring.perFiveWicketHaul],
+            ["Five wicket innings", scoring.perFiveWicketHaul],
           ]}
         />
         <ScoreGroup
@@ -73,8 +73,7 @@ function Scoring({ scoring }: { scoring: ScoringConfig }) {
       <div className="help-note-list">
         {scoring.econBonusPerNetBall !== 0 ? (
           <p>
-            <strong>Economy bonus:</strong> each innings earns {scoring.econBonusPerNetBall} point per ball
-            bowled above the runs conceded, rounded down. There is no penalty when runs exceed balls.
+            <strong>Economy bonus:</strong> bowlers earn bonus points for conceding fewer than one run per ball. For every four runs below that mark, they earn 1 point, calculated separately for each innings and rounded down. There is no penalty for conceding more than one run per ball.
           </p>
         ) : null}
         {scoring.srBonusPoints !== 0 ? (
@@ -91,7 +90,7 @@ function Scoring({ scoring }: { scoring: ScoringConfig }) {
         ) : null}
         {scoring.secondInningsMultiplier !== 1 ? (
           <p>
-            <strong>Second innings:</strong> points earned in a player&apos;s team&apos;s second innings are multiplied by{" "}
+            <strong>Second innings:</strong> points earned in a player&apos;s team&apos;s second innings count for {" "}
             {scoring.secondInningsMultiplier}.
           </p>
         ) : null}

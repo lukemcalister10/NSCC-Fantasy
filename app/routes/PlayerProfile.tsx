@@ -6,6 +6,7 @@ import { PriceMovement } from "../components/PriceMovement";
 import { BroadcastPanel } from "../components/BroadcastPanel";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { money, shortDate } from "../lib/format";
+import { previousSeasonFor, type PreviousSeasonLine } from "../lib/previousSeason";
 
 /** Minimal, dependency-free sparkline of the price path (seq order). */
 function PriceSparkline({ prices }: { prices: number[] }) {
@@ -46,6 +47,41 @@ function totalPoints(p: Profile): number {
   return p.scores.reduce((sum, s) => sum + s.base, 0);
 }
 
+function decimal(value: number | null): string {
+  return value === null ? "—" : value.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function PreviousSeasonStats({ lines }: { lines: PreviousSeasonLine[] }) {
+  return (
+    <>
+      <h2 className="section-title">2025/26 club season</h2>
+      <div className="card previous-season-list">
+        {lines.map((line) => (
+          <section className="previous-season-row" key={`${line.association}-${line.teamName}`}>
+            <div className="previous-season-heading">
+              <div>
+                <h3>{line.grade}</h3>
+                <span>{line.association}</span>
+              </div>
+              <strong className="num">{line.matches} matches</strong>
+            </div>
+            <dl className="previous-season-stats">
+              <div><dt>Runs</dt><dd className="num">{line.runs}</dd></div>
+              <div><dt>Bat avg</dt><dd className="num">{decimal(line.battingAverage)}</dd></div>
+              <div><dt>High score</dt><dd className="num">{line.highScore}</dd></div>
+              <div><dt>Wickets</dt><dd className="num">{line.wickets}</dd></div>
+              <div><dt>Bowl avg</dt><dd className="num">{decimal(line.bowlingAverage)}</dd></div>
+              <div><dt>Best</dt><dd className="num">{line.bestBowling ?? "—"}</dd></div>
+              <div><dt>Catches</dt><dd className="num">{line.catches}</dd></div>
+              {line.stumpings > 0 ? <div><dt>Stumpings</dt><dd className="num">{line.stumpings}</dd></div> : null}
+            </dl>
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function PlayerProfile() {
   const { id } = useParams<{ id: string }>();
   const query = usePlayer(id);
@@ -66,6 +102,7 @@ export function PlayerProfile() {
   const played = p.scores.filter((s) => s.played).length;
   // The breakdown must reconcile: bat + bowl + field + bonus + this = pts (D28).
   const showSecondInnings = p.scores.some((s) => s.second_innings_adjustment !== 0);
+  const previousSeason = previousSeasonFor(p.registry_key);
 
   return (
     <div className="page">
@@ -99,6 +136,8 @@ export function PlayerProfile() {
           <span className="stat-value num">{played}</span>
         </div>
       </BroadcastPanel>
+
+      {previousSeason ? <PreviousSeasonStats lines={previousSeason.seasons} /> : null}
 
       <h2 className="section-title">Price history</h2>
       <div className="card price-history-card">

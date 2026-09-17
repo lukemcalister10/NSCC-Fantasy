@@ -90,6 +90,7 @@ export interface PlayerScoreRow {
 
 export interface PlayerProfile {
   id: string;
+  registry_key: string;
   display_name: string;
   role: PlayerRole;
   wk_eligible: boolean;
@@ -297,6 +298,7 @@ export function usePlayer(playerId: string | undefined) {
     queryFn: async (): Promise<PlayerProfile | null> => {
       const player = unwrap<{
         id: string;
+        registry_key: string;
         display_name: string;
         role: PlayerRole;
         wk_eligible: boolean;
@@ -305,7 +307,7 @@ export function usePlayer(playerId: string | undefined) {
       }>(
         await supabase
           .from("players")
-          .select("id,display_name,role,wk_eligible,starting_price,photo_path")
+          .select("id,registry_key,display_name,role,wk_eligible,starting_price,photo_path")
           .eq("id", playerId!)
           .eq("season_id", seasonId!)
           .single(),
