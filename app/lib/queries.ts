@@ -123,6 +123,10 @@ export interface RoundView {
     away: string | null;
     homeId: string;
     awayId: string | null;
+    homeOwner: string;
+    awayOwner: string | null;
+    homeOwnerId: string;
+    awayOwnerId: string | null;
   }[];
 }
 
@@ -379,13 +383,21 @@ export function useRounds(seasonId: string | undefined) {
           .order("seq", { ascending: true }),
       );
 
-      const teams = unwrap<{ id: string; name: string }[]>(
+      const teams = unwrap<{ id: string; name: string; owner_profile_id: string }[]>(
         await supabase
           .from("fantasy_teams")
-          .select("id,name")
+          .select("id,name,owner_profile_id")
           .eq("season_id", seasonId!),
       );
+      const ownerIds = [...new Set(teams.map((team) => team.owner_profile_id))];
+      const owners = ownerIds.length
+        ? unwrap<{ id: string; display_name: string }[]>(
+            await supabase.from("profiles").select("id,display_name").in("id", ownerIds),
+          )
+        : [];
       const nameById = new Map(teams.map((t) => [t.id, t.name]));
+      const ownerIdByTeamId = new Map(teams.map((t) => [t.id, t.owner_profile_id]));
+      const ownerNameById = new Map(owners.map((owner) => [owner.id, owner.display_name]));
       const teamIds = teams.map((t) => t.id);
 
       return rounds.map((r) => {
@@ -394,6 +406,15 @@ export function useRounds(seasonId: string | undefined) {
           away: f.away === null ? null : (nameById.get(f.away) ?? "—"),
           homeId: f.home,
           awayId: f.away,
+          homeOwner:
+            ownerNameById.get(ownerIdByTeamId.get(f.home) ?? "") ?? "Unknown owner",
+          awayOwner:
+            f.away === null
+              ? null
+              : (ownerNameById.get(ownerIdByTeamId.get(f.away) ?? "") ??
+                "Unknown owner"),
+          homeOwnerId: ownerIdByTeamId.get(f.home) ?? "",
+          awayOwnerId: f.away === null ? null : (ownerIdByTeamId.get(f.away) ?? ""),
         }));
         return {
           id: r.id,
