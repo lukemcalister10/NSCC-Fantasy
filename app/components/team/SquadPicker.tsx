@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { PlayerRole } from "../../../src/config/types";
 import { money } from "../../lib/format";
 import { PriceMovement } from "../PriceMovement";
@@ -36,6 +36,7 @@ export function SquadTable({
   captaincyDisabledReason: string | null;
   availability: Map<string, PlayerAvailabilityStatus>;
 }) {
+  const location = useLocation();
   const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
   const sortedHoldings = useMemo(
     () =>
@@ -106,7 +107,11 @@ export function SquadTable({
                 <td className="team-name">
                   <span className="squad-player">
                     {h.player ? (
-                      <Link to={`/players/${h.player.id}`} className="squad-player-link">
+                      <Link
+                        to={`/players/${h.player.id}`}
+                        state={{ backgroundLocation: location }}
+                        className="squad-player-link"
+                      >
                         {h.player.display_name}
                       </Link>
                     ) : (
