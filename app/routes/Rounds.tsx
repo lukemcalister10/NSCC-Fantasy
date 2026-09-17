@@ -3,14 +3,10 @@ import { useSeason, useRounds, type RoundView } from "../lib/queries";
 import { useH2hResults, type H2hResultRow } from "../lib/teamQueries";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { dateTime } from "../lib/format";
+import { useAuth } from "../auth/AuthProvider";
 import "../styles/team.css";
 
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Scheduled",
-  in_progress: "In progress",
-  finalised: "Final",
-  abandoned: "Abandoned",
-};
+type RoundStatus = "completed" | "current" | "scheduled";
 
 /**
  * A settled fixture, matched onto the DERIVED schedule.
@@ -88,12 +84,14 @@ function resultsFor(
 
 function RoundCard({
   round,
-  provisional,
+  status,
   results,
+  userId,
 }: {
   round: RoundView;
-  provisional: boolean;
+  status: RoundStatus;
   results: H2hResultRow[];
+  userId: string | undefined;
 }) {
   const { byFixture, disagreement } = useMemo(
     () => resultsFor(round.fixtures, results),
@@ -101,14 +99,23 @@ function RoundCard({
   );
 
   return (
-    <div className="card round-card">
-      <div className="round-head">
+    <details className="card round-card" open={status === "current"}>
+      <summary className="round-head">
         <div>
-          <h2 className="round-name">{round.name}</h2>
+          <span className="round-title-line">
+            <h2 className="round-name">{round.name}</h2>
+            <span className={`round-status round-status-${status}`}>
+              {status === "completed"
+                ? "Completed"
+                : status === "current"
+                  ? "Current"
+                  : "Scheduled"}
+            </span>
+          </span>
           <span className="round-lock">Locks {dateTime(round.lock_at)}</span>
         </div>
-        <span className="round-seq">R{round.seq}</span>
-      </div>
+        <span className="round-expand" aria-hidden="true" />
+      </summary>
 
       <div className="round-body">
         <div className="round-col">
@@ -116,14 +123,12 @@ function RoundCard({
           {round.matches.length === 0 ? (
             <p className="round-empty">No matches assigned.</p>
           ) : (
-            <ul className="match-list">
+            <ul className="match-list round-match-grid">
               {round.matches.map((m) => (
                 <li key={m.id} className="match-item">
                   <span className="match-grade">{m.grade}</span>
-                  <span className="match-opp">v {m.opponent}</span>
-                  <span className={`match-status status-${m.status}`}>
-                    {STATUS_LABEL[m.status] ?? m.status}
-                  </span>
+                  <span className="match-v">v</span>
+                  <span className="match-opp">{m.opponent}</span>
                 </li>
               ))}
             </ul>
@@ -131,10 +136,7 @@ function RoundCard({
         </div>
 
         <div className="round-col">
-          <h3 className="round-col-title">
-            Fixtures
-            {provisional ? <span className="provisional">provisional</span> : null}
-          </h3>
+          <h3 className="round-col-title">Fixtures</h3>
           {round.fixtures.length === 0 ? (
             <p className="round-empty">No teams registered yet.</p>
           ) : (
@@ -145,8 +147,16 @@ function RoundCard({
                   <li key={i} className="fixture-item">
                     {f.away === null ? (
                       <>
-                        <span className="fixture-team">{f.home}</span>
-                        <span className="fixture-bye">BYE</span>
+                        <span
+                          className={`fixture-team-block${
+                            f.homeOwnerId === userId ? " fixture-team-mine" : ""
+                          }`}
+                        >
+                          <strong>{f.home}</strong>
+                          <em>{f.homeOwner}</em>
+                        </span>
+                        <span className="fixture-v">—</span>
+                        <span className="fixture-team-block fixture-bye">BYE</span>
                         {result ? (
                           <span className="fixture-result">
                             {result.homePoints} v {result.byeMedian} median
@@ -158,9 +168,23 @@ function RoundCard({
                       </>
                     ) : (
                       <>
-                        <span className="fixture-team">{f.home}</span>
+                        <span
+                          className={`fixture-team-block${
+                            f.homeOwnerId === userId ? " fixture-team-mine" : ""
+                          }`}
+                        >
+                          <strong>{f.home}</strong>
+                          <em>{f.homeOwner}</em>
+                        </span>
                         <span className="fixture-v">v</span>
-                        <span className="fixture-team fixture-away">{f.away}</span>
+                        <span
+                          className={`fixture-team-block fixture-away${
+                            f.awayOwnerId === userId ? " fixture-team-mine" : ""
+                          }`}
+                        >
+                          <strong>{f.away}</strong>
+                          <em>{f.awayOwner}</em>
+                        </span>
                         {result ? (
                           <span className="fixture-result">
                             {result.homePoints} – {result.awayPoints}
@@ -189,7 +213,7 @@ function RoundCard({
           ) : null}
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -204,9 +228,9 @@ function RoundCard({
  * ladder counts are visibly the same event.
  */
 export function Rounds() {
+  const { session } = useAuth();
   const season = useSeason();
   const rounds = useRounds(season.data?.id);
-  const provisional = season.data ? season.data.locked_at === null : true;
 
   const roundIds = useMemo(() => (rounds.data ?? []).map((r) => r.id), [rounds.data]);
   const h2h = useH2hResults(season.data?.id, roundIds);
@@ -220,6 +244,16 @@ export function Rounds() {
     }
     return m;
   }, [h2h.data]);
+
+  const currentRoundId = useMemo(
+    () =>
+      (rounds.data ?? []).find((round) =>
+        round.matches.some(
+          (match) => match.status !== "finalised" && match.status !== "abandoned",
+        ),
+      )?.id ?? null,
+    [rounds.data],
+  );
 
   return (
     <div className="page">
@@ -237,8 +271,19 @@ export function Rounds() {
             <RoundCard
               key={r.id}
               round={r}
-              provisional={provisional}
+              status={
+                r.id === currentRoundId
+                  ? "current"
+                  : r.matches.length > 0 &&
+                      r.matches.every(
+                        (match) =>
+                          match.status === "finalised" || match.status === "abandoned",
+                      )
+                    ? "completed"
+                    : "scheduled"
+              }
               results={resultsByRound.get(r.id) ?? []}
+              userId={session?.user.id}
             />
           ))}
         </div>
