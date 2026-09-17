@@ -1,5 +1,10 @@
 import { Link, useParams } from "react-router-dom";
-import { usePlayer, useSeason, type PlayerProfile as Profile } from "../lib/queries";
+import {
+  usePlayer,
+  usePlayerSelectionPopularity,
+  useSeason,
+  type PlayerProfile as Profile,
+} from "../lib/queries";
 import { RoleBadge } from "../components/RoleBadge";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { PriceMovement } from "../components/PriceMovement";
@@ -91,7 +96,10 @@ export function PlayerProfile() {
   const season = useSeason();
   const rounds = useSeasonRounds(season.data?.id);
   const activeRound = activeRoundOf(rounds.data);
+  const popularityRound =
+    activeRound ?? [...(rounds.data ?? [])].sort((a, b) => b.seq - a.seq)[0];
   const availability = usePlayerAvailability(activeRound?.id);
+  const popularity = usePlayerSelectionPopularity(popularityRound?.id, id);
 
   if (query.isLoading) return <Loading />;
   if (query.error) return <ErrorState error={query.error} />;
@@ -143,6 +151,19 @@ export function PlayerProfile() {
         <div className="stat">
           <span className="stat-label">Matches played</span>
           <span className="stat-value num">{played}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Selected in teams</span>
+          <span className="stat-value num">
+            {popularity.isLoading
+              ? "—"
+              : `${Math.round(popularity.data?.percentage ?? 0)}%`}
+          </span>
+          {popularity.data ? (
+            <span className="stat-detail num">
+              {popularity.data.selectedCount} of {popularity.data.teamCount}
+            </span>
+          ) : null}
         </div>
       </BroadcastPanel>
 

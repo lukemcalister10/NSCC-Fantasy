@@ -546,6 +546,10 @@
   font-size: var(--fs-lg);
   font-weight: 800;
 }
+.stat-detail {
+  color: var(--broadcast-ink-muted);
+  font-size: var(--fs-xs);
+}
 .statline .movement-up {
   color: #58d69a;
 }
