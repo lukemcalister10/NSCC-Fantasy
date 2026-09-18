@@ -106,18 +106,20 @@ export function SquadTable({
                 </td>
                 <td className="team-name">
                   <span className="squad-player">
-                    {h.player ? (
-                      <Link
-                        to={`/players/${h.player.id}`}
-                        state={{ backgroundLocation: location }}
-                        className="squad-player-link"
-                      >
-                        {h.player.display_name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                    <PlayerAvailabilityDot status={availability.get(h.playerId)} />
+                    <span className="squad-player-name-row">
+                      {h.player ? (
+                        <Link
+                          to={`/players/${h.player.id}`}
+                          state={{ backgroundLocation: location }}
+                          className="squad-player-link"
+                        >
+                          {h.player.display_name}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                      <PlayerAvailabilityDot status={availability.get(h.playerId)} />
+                    </span>
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress

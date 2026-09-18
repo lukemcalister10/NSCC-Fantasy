@@ -171,6 +171,7 @@
 }
 .squad-table .row-locked { background: var(--surface-subtle); }
 .squad-player { display: flex; flex-direction: column; gap: 2px; }
+.squad-player-name-row { display: inline-flex; align-items: center; gap: 6px; }
 .squad-player-link { color: var(--ink); font-weight: 700; text-decoration: none; }
 .squad-player-link:hover { color: var(--accent); text-decoration: underline; }
 .squad-player .blocked-reason { padding: 0; }
