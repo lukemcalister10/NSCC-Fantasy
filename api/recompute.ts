@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { withPgClient } from "../src/db/pgClient.js";
+import { resolveSslPolicy, withPgClient } from "../src/db/pgClient.js";
 import { runRecompute } from "../src/db/runRecompute.js";
 
 /**
@@ -79,10 +79,11 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   }
 
   const body = (typeof req.body === "string" ? safeParse(req.body) : req.body) as
-    | { seasonId?: unknown }
+    | { seasonId?: unknown; action?: unknown }
     | undefined;
+  const healthCheck = body?.action === "health";
   const seasonId = typeof body?.seasonId === "string" ? body.seasonId : null;
-  if (!seasonId) {
+  if (!healthCheck && !seasonId) {
     res.status(400).json({ error: "seasonId is required" });
     return;
   }
@@ -97,7 +98,15 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       if (rows[0]?.is_league_manager !== true) {
         throw new NotManager();
       }
-      return runRecompute(db, seasonId);
+      if (healthCheck) {
+        const check = await db.query<{ checked_at: Date }>("SELECT current_timestamp AS checked_at");
+        return {
+          ok: true,
+          checkedAt: check.rows[0]?.checked_at.toISOString() ?? new Date().toISOString(),
+          tlsMode: resolveSslPolicy(connectionString).mode,
+        };
+      }
+      return runRecompute(db, seasonId!);
     });
     res.status(200).json(summary);
   } catch (err) {

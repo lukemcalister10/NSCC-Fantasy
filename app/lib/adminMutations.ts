@@ -382,6 +382,73 @@ export class RecomputeError extends Error {
  */
 const RECOMPUTE_TIMEOUT_MS = 75_000;
 
+export interface RecomputeConnectionHealth {
+  ok: true;
+  checkedAt: string;
+  tlsMode: "verify-ca" | "no-verify" | "disabled" | "system-default";
+}
+
+/**
+ * Prove that the deployed server can authenticate the manager and open its
+ * Postgres connection. This deliberately does not accept a season id and does
+ * not invoke the recompute engine, so it cannot alter derived or source data.
+ */
+export async function requestRecomputeConnectionHealth(): Promise<RecomputeConnectionHealth> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new RecomputeError(
+      "session",
+      "your session has expired — sign in again",
+      "Sign out and back in, then check the connection again.",
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await fetch("/api/recompute", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "health" }),
+    });
+  } catch (err) {
+    throw new RecomputeError(
+      "network",
+      err instanceof Error ? err.message : String(err),
+      "The request did not reach the server. Check the connection and try again.",
+    );
+  }
+
+  const payload: unknown = await res.json().catch(() => null);
+  const serverMessage =
+    payload && typeof payload === "object" && "error" in payload
+      ? String((payload as { error: unknown }).error)
+      : null;
+  if (res.ok) return payload as RecomputeConnectionHealth;
+
+  const guidance =
+    res.status === 401
+      ? "Sign out and back in, then check the connection again."
+      : res.status === 403
+        ? "The database does not recognise this account as the league manager."
+        : res.status === 503
+          ? "Add the server credentials to the Production environment and redeploy."
+          : "The server reached the check but could not open or verify its database connection. Copy the error shown here.";
+  throw new RecomputeError(
+    res.status === 401
+      ? "session"
+      : res.status === 403
+        ? "refused"
+        : res.status === 503
+          ? "not-configured"
+          : res.status === 500
+            ? "engine"
+            : "unknown",
+    serverMessage ?? `connection check failed (HTTP ${res.status})`,
+    guidance,
+  );
+}
+
 /**
  * Ask the server to run a FULL-SEASON recompute. There is no partial pass: prices
  * are a chain, so no round can be rebuilt alone without re-deriving everything

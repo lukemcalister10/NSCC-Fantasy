@@ -5,7 +5,9 @@ import { AdminPage, Section, SeasonLockBanner, StatusLine } from "./adminChrome"
 import { useAdminSeason, useAdminPlayers, useAdminRounds } from "../../lib/adminQueries";
 import {
   RecomputeError,
+  requestRecomputeConnectionHealth,
   requestRecompute,
+  type RecomputeConnectionHealth,
   type RecomputeResult,
 } from "../../lib/adminMutations";
 import { Loading, ErrorState, EmptyState } from "../../components/states";
@@ -95,9 +97,59 @@ export function AdminHome() {
       </Section>
 
       <Section title="Recompute">
+        <ConnectionHealthControl />
         <RecomputeControl seasonId={season.data.id} />
       </Section>
     </AdminPage>
+  );
+}
+
+function ConnectionHealthControl() {
+  const check = useMutation({ mutationFn: requestRecomputeConnectionHealth });
+  const result = check.data as RecomputeConnectionHealth | undefined;
+  const failure = check.error instanceof RecomputeError ? check.error : null;
+  const tlsLabel =
+    result?.tlsMode === "verify-ca"
+      ? "TLS certificate verified"
+      : result?.tlsMode === "system-default"
+        ? "TLS verified by system trust"
+        : result?.tlsMode === "no-verify"
+          ? "TLS certificate not verified"
+          : result?.tlsMode === "disabled"
+            ? "TLS disabled"
+            : null;
+
+  return (
+    <div className="card" style={{ padding: "var(--sp-4)", marginBottom: "var(--sp-3)" }}>
+      <p className="admin-note">
+        Checks that this deployment can securely connect to the database. This is read-only: it
+        does not run recompute or change league data.
+      </p>
+      <div className="admin-actions">
+        <button
+          className="btn-ghost"
+          disabled={check.isPending}
+          onClick={() => check.mutate()}
+        >
+          {check.isPending ? "Checking…" : "Check database connection"}
+        </button>
+      </div>
+      {result ? (
+        <div className="admin-banner admin-banner-ok" style={{ marginTop: "var(--sp-3)" }}>
+          <strong>Database connected.</strong>
+          <span>{tlsLabel}.</span>
+        </div>
+      ) : null}
+      {failure ? (
+        <div className="admin-banner admin-banner-locked" style={{ marginTop: "var(--sp-3)" }} role="alert">
+          <strong>Database connection failed.</strong>
+          <span>{failure.message}</span>
+          <span>{failure.guidance}</span>
+        </div>
+      ) : (
+        <StatusLine error={check.error} />
+      )}
+    </div>
   );
 }
 
