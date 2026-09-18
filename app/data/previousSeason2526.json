@@ -357,6 +357,52 @@
       }
     ]
   },
+  "Ben Dugan": {
+    "clubPlayerId": "2f728172-c71e-4dfc-b2ab-394992870f1b",
+    "clubName": "Ben Dugan",
+    "seasons": [
+      {
+        "season": "2025/26",
+        "teamName": "2025/26 NCU 3rd Grade",
+        "grade": "3rd Grade",
+        "association": "Northern Cricket Union",
+        "matches": 10,
+        "innings": 7,
+        "notOuts": 1,
+        "runs": 23,
+        "highScore": 14,
+        "battingAverage": 3.83,
+        "strikeRate": 42.86,
+        "overs": "50.0",
+        "wickets": 7,
+        "bestBowling": "2/67",
+        "bowlingAverage": 40.57,
+        "economy": 5.68,
+        "catches": 1,
+        "stumpings": 0
+      },
+      {
+        "season": "2025/26",
+        "teamName": "2025/26 MWCA 5th Grade",
+        "grade": "5th Grade",
+        "association": "Manly Warringah Cricket Association",
+        "matches": 2,
+        "innings": 1,
+        "notOuts": 0,
+        "runs": 0,
+        "highScore": 0,
+        "battingAverage": 0,
+        "strikeRate": 60,
+        "overs": "10.0",
+        "wickets": 1,
+        "bestBowling": "1/21",
+        "bowlingAverage": 36,
+        "economy": 3.6,
+        "catches": 0,
+        "stumpings": 0
+      }
+    ]
+  },
   "Kristian Anderson": {
     "clubPlayerId": "bfcc7e84-7783-4d30-90b0-d81448ded75b",
     "clubName": "Kristian Anderson",

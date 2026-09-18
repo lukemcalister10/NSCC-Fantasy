@@ -27,4 +27,13 @@ describe("previous-season profile order", () => {
       "Manly Warringah Cricket Association",
     ]);
   });
+
+  it("includes Ben Dugan with 3rd Grade before Manly 5th Grade", () => {
+    const player = previousSeasonFor("Ben Dugan");
+    expect(player?.clubPlayerId).toBe("2f728172-c71e-4dfc-b2ab-394992870f1b");
+    expect(player?.seasons.map((line) => [line.grade, line.association])).toEqual([
+      ["3rd Grade", "Northern Cricket Union"],
+      ["5th Grade", "Manly Warringah Cricket Association"],
+    ]);
+  });
 });

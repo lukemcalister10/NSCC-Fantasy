@@ -43,6 +43,7 @@ const rosterOverrides: ClubPlayer[] = [
   { id: "eed61074-054b-4918-b2a1-d932aeb4ade0", name: "Andrew Castellano" },
   { id: "1f406f67-d284-43ec-b778-eecb4e872433", name: "Ralph Amerasinghe" },
   { id: "fe54f44a-bbab-476c-ac00-95f7ffb7af87", name: "Jonathan Villanueva" },
+  { id: "2f728172-c71e-4dfc-b2ab-394992870f1b", name: "Ben Dugan" },
 ];
 
 function normalise(name: string): string {
