@@ -104,7 +104,7 @@ let trdc = 0;
 async function buyWholeSquad(db: DbClient, team: string, round: string): Promise<void> {
   for (const [pid] of SQUAD) {
     await db.query(
-      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'buy',$3,40000,$4)",
+      "INSERT INTO trades (id, fantasy_team_id, kind, player_id, price, round_id) VALUES ($1,$2,'buy',$3,50000,$4)",
       [`00000000-0000-0000-0000-13d7e${String(trdc++).padStart(7, "0")}`, team, pid, round],
     );
   }
