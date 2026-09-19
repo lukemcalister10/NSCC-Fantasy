@@ -83,9 +83,9 @@ describe("the settings page exposes exactly the economy the config carries", () 
     expect(unlabelled.map((f) => fieldPathKey(f.path))).toEqual([]);
   });
 
-  it("only the salary cap is computed rather than typed — it is not an input (O3)", () => {
+  it("allows the advertised salary cap to be configured before lock", () => {
     const computed = CONFIG_FIELDS.filter((f) => f.computedAtLock).map((f) => fieldPathKey(f.path));
-    expect(computed).toEqual(["squad.cap"]);
+    expect(computed).toEqual([]);
   });
 });
 

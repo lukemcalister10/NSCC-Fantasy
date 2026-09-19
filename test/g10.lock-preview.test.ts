@@ -6,7 +6,7 @@ import { makeTestDb, seedSeason, asAuthed } from "./helpers/pgliteDb.js";
 import type { DbClient } from "../src/db/repository.js";
 
 /**
- * THE REHEARSAL PREVIEW IS THE LOCK'S OWN ARITHMETIC (O3 / KICKOFF §SEASON LOCK).
+ * THE REHEARSAL PREVIEW SHOWS THE EXACT CONFIGURED CAP THE LOCK WILL FREEZE.
  *
  * KICKOFF says to rehearse the lock on a scratch season before firing it on the
  * real one, which is only worth anything if the rehearsal is FAITHFUL. The naive
@@ -171,17 +171,16 @@ describe("the preview promises the cap the lock then writes", () => {
         const before = await preview(db);
         expect(before.lockable).toBe(true);
         expect(before.blocker).toBeNull();
-        // The hand calculation in the table above.
-        expect(num(before.computed_cap)).toBe(pool.expectedCap);
-        // Pre-lock the stored cap is still the placeholder, so the promise is
-        // about a value that does not yet exist anywhere.
+        // The legacy computed_cap field now carries the authoritative configured
+        // cap so older clients still receive the value the lock will freeze.
+        expect(num(before.computed_cap)).toBe(FIXTURE_CONFIG.squad.cap);
         expect(num(before.current_cap)).toBe(FIXTURE_CONFIG.squad.cap);
 
         await expect(lock(db)).resolves.toBeDefined();
 
         // What the lock actually wrote === what the preview promised.
         expect(await capOf(db)).toBe(num(before.computed_cap));
-        expect(await capOf(db)).toBe(pool.expectedCap);
+        expect(await capOf(db)).toBe(FIXTURE_CONFIG.squad.cap);
       },
       60_000,
     );
@@ -268,16 +267,17 @@ describe("every refusal is named, and named identically in both places", () => {
     await expect(lock(db)).rejects.toThrow(/squad\.teamSize/);
   }, 60_000);
 
-  it("a config missing pricing.roundingIncrement names the missing key", async () => {
+  it("does not make cap locking depend on the price-rounding increment", async () => {
     const db = await seeded([{ price: 50_000 }]);
     await db.query(
       "UPDATE seasons SET config = config #- '{pricing,roundingIncrement}' WHERE id = $1",
       [SEASON],
     );
     const p = await preview(db);
-    expect(p.lockable).toBe(false);
-    expect(p.blocker).toMatch(/roundingIncrement/);
-    await expect(lock(db)).rejects.toThrow(/roundingIncrement/);
+    expect(p.lockable).toBe(true);
+    expect(p.blocker).toBeNull();
+    await expect(lock(db)).resolves.toBeDefined();
+    expect(await capOf(db)).toBe(FIXTURE_CONFIG.squad.cap);
   }, 60_000);
 });
 
@@ -285,8 +285,8 @@ describe("every refusal is named, and named identically in both places", () => {
 // G11: the rounding step is config, not a literal
 // ---------------------------------------------------------------------------
 
-describe("G11 — the cap's rounding step comes from config, with no code change", () => {
-  it("moving pricing.roundingIncrement moves the cap the lock computes", async () => {
+describe("G11 — pricing arithmetic does not silently move the advertised cap", () => {
+  it("moving pricing.roundingIncrement does not move the configured cap", async () => {
     // Same pool as the boundary case: mean 19,275 · teamSize 6 · raw 115,650.
     //   increment $100  -> 115,650 / 100 = 1,156.5 -> +0.5 -> floor 1,157 -> 115,700
     //   increment $1000 -> 115,650 / 1000 = 115.65 -> +0.5 -> floor 116   -> 116,000
@@ -297,9 +297,9 @@ describe("G11 — the cap's rounding step comes from config, with no code change
 
     const db = await seeded(prices, config);
     const p = await preview(db);
-    expect(num(p.computed_cap)).toBe(116_000);
+    expect(num(p.computed_cap)).toBe(FIXTURE_CONFIG.squad.cap);
     await lock(db);
-    expect(await capOf(db)).toBe(116_000);
+    expect(await capOf(db)).toBe(FIXTURE_CONFIG.squad.cap);
   }, 60_000);
 });
 
@@ -308,7 +308,7 @@ describe("G11 — the cap's rounding step comes from config, with no code change
 // ---------------------------------------------------------------------------
 
 describe("removing a withdrawn registrant from the pool before lock", () => {
-  it("removes a historyless player, moves the mean, and moves the cap with it", async () => {
+  it("removes a historyless player and moves the mean without moving the cap", async () => {
     // P3 is an inactive floor-priced registrant dragging the mean down (A9).
     const db = await seeded([
       { price: 50_000 },
@@ -318,7 +318,7 @@ describe("removing a withdrawn registrant from the pool before lock", () => {
     ]);
     const before = await preview(db);
     expect(before.pool_size).toBe(4);
-    expect(num(before.computed_cap)).toBe(115_700);
+    expect(num(before.computed_cap)).toBe(FIXTURE_CONFIG.squad.cap);
 
     await expect(
       asManager(db, () => db.query("DELETE FROM players WHERE id = $1", [pid(3)])),
@@ -328,10 +328,10 @@ describe("removing a withdrawn registrant from the pool before lock", () => {
     const after = await preview(db);
     expect(after.pool_size).toBe(3);
     expect(after.inactive_count).toBe(0);
-    expect(num(after.computed_cap)).toBe(136_000);
+    expect(num(after.computed_cap)).toBe(FIXTURE_CONFIG.squad.cap);
 
     await lock(db);
-    expect(await capOf(db)).toBe(136_000); // the removal is what the lock froze
+    expect(await capOf(db)).toBe(FIXTURE_CONFIG.squad.cap);
   }, 60_000);
 
   it("writes the removal to the registry audit log, since it moves the cap", async () => {
@@ -397,8 +397,7 @@ describe("removing a withdrawn registrant from the pool before lock", () => {
     await expect(
       asManager(db, () => db.query("DELETE FROM players WHERE id = $1", [pid(1)])),
     ).rejects.toThrow(/is locked; player .* cannot be removed from the pool/);
-    // The cap the lock computed still describes the pool it was computed over.
-    expect(await capOf(db)).toBe(177_000); // mean 29,500 × 6
+    expect(await capOf(db)).toBe(FIXTURE_CONFIG.squad.cap);
   }, 60_000);
 
   it("clears a removed player's stale derived rows rather than tripping their foreign keys", async () => {

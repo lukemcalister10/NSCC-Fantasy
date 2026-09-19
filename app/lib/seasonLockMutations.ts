@@ -33,7 +33,7 @@ export function explainLockError(err: unknown): string {
     return "Save your settings changes first, then lock. The locking statement is not allowed to change config as well, so that the cap you were shown in the preview is the cap that gets frozen.";
   }
   if (/is locked; config is immutable/.test(message)) {
-    return "The season is locked. Settings, scoring rules and the computed cap are frozen and there is no unlock (G10).";
+    return "The season is locked. Settings, scoring rules and the configured cap are frozen and there is no unlock (G10).";
   }
   if (/is locked; locked_at cannot change/.test(message)) {
     return "The season is already locked. The lock is a one-way door — it cannot be moved or cleared (G10).";

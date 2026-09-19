@@ -54,10 +54,7 @@ export interface ConfigField {
    * non-negative, which is why this is opt-in per field.
    */
   signed?: boolean;
-  /**
-   * True for values the SEASON LOCK computes rather than the operator typing
-   * (O3's cap). Rendered read-only, with the preview's figure beside it.
-   */
+  /** True for values computed at lock rather than entered by the operator. */
   computedAtLock?: boolean;
 }
 
@@ -111,7 +108,7 @@ const PRICING_FIELDS: ConfigField[] = [
 ];
 
 const SQUAD_FIELDS: ConfigField[] = [
-  { path: ["squad", "teamSize"], label: "Team size", decision: "O2", kind: "count", hint: "also the cap multiplier: cap = team size × mean starting price" },
+  { path: ["squad", "teamSize"], label: "Team size", decision: "O2", kind: "count" },
   ...ROLES.map(
     (role): ConfigField => ({
       path: ["squad", "roleMinimums", role],
@@ -126,8 +123,7 @@ const SQUAD_FIELDS: ConfigField[] = [
     label: "Salary cap",
     decision: "O3",
     kind: "money",
-    computedAtLock: true,
-    hint: "computed BY the lock as team size × mean starting price, 1.0× with no headroom — never typed in",
+    hint: "the advertised cap; season lock freezes this value unchanged",
   },
   { path: ["squad", "tradesPerRound"], label: "Trades per round", decision: "O1", kind: "count" },
 ];

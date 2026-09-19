@@ -4,12 +4,9 @@ import { supabase } from "./supabase";
 /**
  * THE REHEARSAL PREVIEW, READ FROM THE DATABASE.
  *
- * Every figure here comes from `public.season_lock_preview()` (0008), which calls
- * the SAME functions `enforce_season_lock()` calls. That is the whole design: the
- * cap shown below is not this client's calculation of what the lock would do, it
- * is the lock's own calculation, run without firing. There is deliberately no
- * TypeScript arithmetic anywhere in this file — a second implementation of the O3
- * mean and the D4 rounding is exactly the drift the preview exists to rule out.
+ * Every figure here comes from `public.season_lock_preview()`. The configured cap
+ * shown below is the exact value the lock will freeze; the client does not derive
+ * a second value from the player pool.
  *
  * The RPC lives in `public` because PostgREST only exposes that schema, and is
  * SECURITY INVOKER, so a caller sees it only if RLS already lets them read
@@ -44,7 +41,7 @@ export interface SeasonLockPreview {
   teamSize: number | null;
   roundingIncrement: number | null;
   floorPrice: number | null;
-  /** The cap currently stored in config — a placeholder pre-lock. */
+  /** The authoritative cap currently stored in config. */
   currentCap: number | null;
   poolSize: number;
   pricedCount: number;
@@ -53,7 +50,7 @@ export interface SeasonLockPreview {
   inactiveCount: number;
   /** Mean starting price over ALL players in the pool (O3, literal). */
   meanStartingPrice: number | null;
-  /** The cap the lock WILL write. Not an estimate of it. */
+  /** The cap the lock will freeze unchanged. Kept under the legacy RPC field name. */
   computedCap: number | null;
   /** How many sit exactly at the D4 floor — the A9 pool-completeness signal. */
   atFloorCount: number;

@@ -150,9 +150,7 @@ export interface SquadConfig {
    * these minimums lands with the later selection-validation slice (no gate yet).
    */
   roleMinimums: Record<PlayerRole, number>;
-  /** Salary cap (O3). Computed BY the season-lock action as
-   *  teamSize × mean(starting_price) over the pool, rounded to nearest $100
-   *  (D4). Pre-lock this is a tunable placeholder, overwritten at lock. */
+  /** Salary cap. Configured before the season and frozen unchanged at lock. */
   cap: number;
   /** Trades allowed per round (O1). */
   tradesPerRound: number;

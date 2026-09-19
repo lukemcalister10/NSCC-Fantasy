@@ -111,7 +111,7 @@ describe("registry — pre-lock edits, post-lock refusals, mid-season adds", () 
     expect(seen.rows[0]!.n).toBe(0);
   });
 
-  it("the season locks, computing the cap over the pool (O3, unchanged behaviour)", async () => {
+  it("the season locks while preserving the advertised cap", async () => {
     await asAuthed(db, managerCtx, async () => {
       await db.query("UPDATE seasons SET locked_at = now() WHERE id = $1", [SEASON]);
     });
@@ -119,8 +119,7 @@ describe("registry — pre-lock edits, post-lock refusals, mid-season adds", () 
       "SELECT config #>> '{squad,cap}' AS cap, locked_at AS locked FROM seasons WHERE id = $1",
       [SEASON],
     );
-    // teamSize 6 × mean(72,000, 35,000) = 6 × 53,500 = $321,000.
-    expect(rows[0]!.cap).toBe("321000");
+    expect(rows[0]!.cap).toBe(String(FIXTURE_CONFIG.squad.cap));
     expect(rows[0]!.locked).toBeTruthy();
   });
 

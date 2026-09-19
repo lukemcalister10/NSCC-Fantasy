@@ -34,12 +34,12 @@ import type { LeagueConfig } from "../../../src/config/types";
  * SETTINGS + SEASON LOCK (/admin/settings) — C5.
  *
  * WHAT WAS ACTUALLY MISSING, said plainly, because C5's wording overstates it:
- * the season lock's ENFORCEMENT has existed and been green since the locks slice
- * (0002) — the freeze, the cap computation, the unpriced-player block and the
+ * the season lock's ENFORCEMENT has existed since the locks slice (0002) — the
+ * freeze, the cap preservation, the unpriced-player block and the
  * one-way door are all triggers, all verified. What did not exist was any way for
  * the operator to SEE or FIRE it: this page was a stub, so the only route to a
  * locked season was `UPDATE seasons SET locked_at = now()` in the SQL editor,
- * with no way to know beforehand what cap that would compute. This page is the
+ * with no way to confirm beforehand what cap it would freeze. This page is the
  * door handle and the window beside the door.
  *
  * G11 DISCIPLINE. Not one economy value is written in this file. Every input is
@@ -86,7 +86,7 @@ export function AdminSettings() {
         />
       </Section>
 
-      <Section title="The pool the cap is computed from">
+      <Section title="Player pool check">
         <PoolPanel
           players={players.data ?? []}
           preview={preview.data ?? null}
@@ -138,8 +138,8 @@ function LockStateBanner({ lockedAt, cap }: { lockedAt: string | null; cap: numb
     <div className="admin-banner admin-banner-locked">
       <strong>Season locked {dateTime(lockedAt)}.</strong>
       <span>
-        The economy is frozen and the salary cap is {money(cap)}, computed by the lock itself
-        (O3). There is no unlock: the database refuses every change below, whichever way it is
+        The economy is frozen and the salary cap is {money(cap)}. There is no unlock: the
+        database refuses every change below, whichever way it is
         attempted (G10).
       </span>
     </div>
@@ -310,8 +310,8 @@ function ConfigInput({
       {computed ? (
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-faint)" }}>
           {previewCap === null
-            ? "computed by the lock action — not typed in"
-            : `the lock will compute ${money(previewCap)}`}
+            ? "calculated automatically"
+            : `calculated value: ${money(previewCap)}`}
         </span>
       ) : field.kind === "money" && value !== "" && Number.isFinite(Number(value)) ? (
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-faint)" }}>
@@ -369,10 +369,8 @@ function PoolPanel({
   return (
     <div className="card" style={{ padding: "var(--sp-4)" }}>
       <p className="admin-note">
-        The cap is the mean starting price across <strong>all</strong> players in the pool,
-        taken literally (O3) — active and inactive alike. So the pool must contain only real
-        registrants when you lock. Remove withdrawals; do not rely on the active flag, which
-        means "not selectable", not "not in the pool".
+        Every player must have a starting price before lock. The salary cap is the configured
+        value above and will not be recalculated from this pool.
       </p>
 
       {unpriced.length > 0 ? (
@@ -412,11 +410,9 @@ function PoolPanel({
         <div style={{ marginTop: "var(--sp-3)" }}>
           <p className="admin-note">
             <strong>
-              {inactive.length} inactive player{inactive.length === 1 ? "" : "s"} still counted
-              in the cap.
+              {inactive.length} inactive player{inactive.length === 1 ? "" : "s"} in the pool.
             </strong>{" "}
-            If they are not playing this season, remove them from the pool — that is what keeps
-            O3's "all players" honest without changing what O3 means. Removal works only for
+            Remove them only if they should not remain in the registry. Removal works only for
             players with no history, and never after lock.
           </p>
           <div className="card table-card">
@@ -505,9 +501,8 @@ function RehearsalPanel({ preview }: { preview: SeasonLockPreview }) {
   return (
     <div className="card" style={{ padding: "var(--sp-4)" }}>
       <p className="admin-note">
-        Nothing on this panel writes anything. The cap below is not an estimate of what the
-        lock would do — it is the lock's own computation, run without firing, so what you
-        rehearse is what you get.
+        Nothing on this panel writes anything. It shows the exact configured cap that the lock
+        will preserve and freeze.
       </p>
 
       <ul className="admin-log">
@@ -528,13 +523,10 @@ function RehearsalPanel({ preview }: { preview: SeasonLockPreview }) {
           {preview.poolSize} ({floorShare}%)
         </li>
         <li>
-          Cap the lock will compute: <strong>{money(preview.computedCap)}</strong> ={" "}
-          {preview.teamSize ?? "—"} × {money(preview.meanStartingPrice)}, rounded to the nearest{" "}
-          {money(preview.roundingIncrement)} with halves up (O3/D4)
+          Cap the lock will freeze unchanged: <strong>{money(preview.currentCap)}</strong>
         </li>
         <li>
-          Cap currently stored: {money(preview.currentCap)}{" "}
-          {preview.lockedAt === null ? "(placeholder — the lock overwrites it)" : "(frozen)"}
+          Cap status: {preview.lockedAt === null ? "configured and ready to freeze" : "frozen"}
         </li>
       </ul>
 
@@ -643,7 +635,7 @@ function FirePanel({
             floor
           </li>
           <li>
-            Cap to be computed and frozen: <strong>{money(preview.computedCap)}</strong>
+            Configured cap to be frozen unchanged: <strong>{money(preview.currentCap)}</strong>
           </li>
           <li>
             Fantasy-team registration closes permanently — fixtures are derived from the team
@@ -693,9 +685,8 @@ function LockedRecord({
           Locked <strong>{dateTime(lockedAt)}</strong>
         </li>
         <li>
-          Salary cap <strong>{money(preview?.currentCap ?? null)}</strong>, computed by the lock
-          over {preview?.poolSize ?? "—"} players at a mean of{" "}
-          {money(preview?.meanStartingPrice ?? null)} (O3)
+          Salary cap <strong>{money(preview?.currentCap ?? null)}</strong>, preserved from the
+          configured value
         </li>
         <li>
           All {LOCK_CATEGORIES.length} categories above are frozen. Players can still be added
