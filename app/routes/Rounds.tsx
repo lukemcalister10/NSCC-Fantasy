@@ -4,7 +4,6 @@ import { useH2hResults, type H2hResultRow } from "../lib/teamQueries";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { dateTime } from "../lib/format";
 import { useAuth } from "../auth/AuthProvider";
-import { SortableLadder } from "../components/SortableLadder";
 import "../styles/team.css";
 
 type RoundStatus = "completed" | "current" | "scheduled";
@@ -289,8 +288,6 @@ export function Rounds() {
           ))}
         </div>
       )}
-      <h2 className="section-title">Ladder</h2>
-      <SortableLadder seasonId={season.data?.id} />
     </div>
   );
 }

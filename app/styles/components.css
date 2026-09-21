@@ -724,6 +724,7 @@
 }
 .sortable-ladder .ladder-sort:hover,
 .sortable-ladder .ladder-sort:focus-visible { color: var(--accent); }
+.ladder-owner { color: var(--ink-muted); font-size: var(--fs-xs); font-style: italic; font-weight: 400; }
 .round-grid {
   display: grid;
   gap: var(--sp-4);

@@ -236,6 +236,27 @@ export function useTeamValues(teamIds: string[]) {
   });
 }
 
+export function useTeamOwners(teamIds: string[]) {
+  return useQuery({
+    queryKey: ["team-owners", [...teamIds].sort().join(",")],
+    enabled: teamIds.length > 0,
+    staleTime: STALE,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const teams = unwrap<{ id: string; owner_profile_id: string }[]>(
+        await supabase.from("fantasy_teams").select("id,owner_profile_id").in("id", teamIds),
+      );
+      const ownerIds = [...new Set(teams.map((team) => team.owner_profile_id))];
+      const owners = ownerIds.length
+        ? unwrap<{ id: string; display_name: string }[]>(
+            await supabase.from("profiles").select("id,display_name").in("id", ownerIds),
+          )
+        : [];
+      const names = new Map(owners.map((owner) => [owner.id, owner.display_name]));
+      return new Map(teams.map((team) => [team.id, names.get(team.owner_profile_id) ?? ""]));
+    },
+  });
+}
+
 export function useLeaderboard(seasonId: string | undefined) {
   return useQuery({
     queryKey: ["leaderboard", seasonId],

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLadder, useTeamValues, type LadderRow } from "../lib/queries";
+import { useLadder, useTeamOwners, useTeamValues, type LadderRow } from "../lib/queries";
 import { money } from "../lib/format";
 import { Loading, ErrorState, EmptyState } from "./states";
 
@@ -21,6 +21,7 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
   const ladder = useLadder(seasonId);
   const teamIds = useMemo(() => (ladder.data ?? []).map((row) => row.fantasy_team_id), [ladder.data]);
   const values = useTeamValues(teamIds);
+  const owners = useTeamOwners(teamIds);
   const [sort, setSort] = useState<SortKey>("wins");
   const [descending, setDescending] = useState(true);
 
@@ -53,9 +54,10 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
     }
   }
 
-  if (ladder.isLoading || (teamIds.length > 0 && values.isLoading)) return <Loading />;
+  if (ladder.isLoading || (teamIds.length > 0 && (values.isLoading || owners.isLoading))) return <Loading />;
   if (ladder.error) return <ErrorState error={ladder.error} />;
   if (values.error) return <ErrorState error={values.error} />;
+  if (owners.error) return <ErrorState error={owners.error} />;
   if (!rows.length) return <EmptyState>No rounds have been scored yet.</EmptyState>;
 
   return (
@@ -74,7 +76,7 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
         <tbody>{rows.map((row, index) => (
           <tr key={row.fantasy_team_id}>
             <td className="col-rank num">{index + 1}</td>
-            <td className="team-name">{row.fantasy_teams?.name ?? "—"}</td>
+            <td className="team-name">{row.fantasy_teams?.name ?? "—"}{owners.data?.get(row.fantasy_team_id) ? <span className="ladder-owner"> — {owners.data.get(row.fantasy_team_id)}</span> : null}</td>
             <td className="col-num num">{row.played}</td>
             <td className="col-num num">{row.wins}</td>
             <td className="col-num num">{row.losses}</td>
