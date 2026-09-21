@@ -68,6 +68,13 @@ export function translateRefusal(err: unknown): Refusal {
       serverMessage,
     };
   }
+  if (/trades are closed until the locked round scorecards and prices are processed/i.test(m)) {
+    return {
+      reason: "Trading reopens when the previous round's results and prices are processed.",
+      authority: "Pending-results trade lock",
+      serverMessage,
+    };
+  }
   if (/team size must be/.test(m)) {
     return {
       reason: "Squad size is wrong — the selection must hold exactly the configured team size.",

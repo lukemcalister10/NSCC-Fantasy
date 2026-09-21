@@ -125,9 +125,17 @@ export function Trades() {
 
   const noTradesLeft =
     budget !== null && !budget.initialBuild && (budget.remaining ?? 0) <= 0;
+  const resultsPending = !!state.activeRound && state.rounds.some(
+    (round) => round.seq < state.activeRound!.seq &&
+      new Date(round.lock_at).getTime() <= Date.now() &&
+      round.matches.some((match) =>
+        match.status !== "finalised" && match.status !== "abandoned"),
+  );
 
   const blockers: string[] = [];
   if (state.activeRound === null) blockers.push("Every round has locked (D6/G4).");
+  if (resultsPending)
+    blockers.push("Trading reopens when the previous round's results and prices are processed.");
   if (noTradesLeft)
     blockers.push(
       `No trades remaining this round — the limit is ${budget?.limit} (O1, from config).`,
@@ -220,6 +228,11 @@ export function Trades() {
       <TeamTabs />
 
       <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />
+      {resultsPending ? (
+        <div className="lock-notice" role="status">
+          Trading is paused while the previous round's results and prices are processed.
+        </div>
+      ) : null}
       {budget ? <TradeBudgetNotice budget={budget} /> : null}
       {refusal ? <RefusalNotice refusal={refusal} /> : null}
       {done ? (
