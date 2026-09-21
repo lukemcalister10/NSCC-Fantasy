@@ -11,6 +11,7 @@ import { ROLE_ORDER } from "../../lib/squad";
 import type { PoolPlayer } from "../../lib/teamQueries";
 import type { HoldingView } from "../../lib/useTeamState";
 import { BlockedReason } from "./TeamChrome";
+import { usePlayerAverages } from "../../lib/queries";
 
 /**
  * THE SQUAD (holdings). There is no bench and no emergency mechanic (operator
@@ -20,6 +21,7 @@ import { BlockedReason } from "./TeamChrome";
  * step.
  */
 export function SquadTable({
+  seasonId,
   holdings,
   captainId,
   viceCaptainId,
@@ -28,6 +30,7 @@ export function SquadTable({
   captaincyDisabledReason,
   availability,
 }: {
+  seasonId: string | undefined;
   holdings: HoldingView[];
   captainId: string | null;
   viceCaptainId: string | null;
@@ -37,6 +40,7 @@ export function SquadTable({
   availability: Map<string, PlayerAvailabilityStatus>;
 }) {
   const location = useLocation();
+  const averages = usePlayerAverages(seasonId);
   const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
   const sortedHoldings = useMemo(
     () =>
@@ -64,6 +68,7 @@ export function SquadTable({
         <colgroup>
           <col className="squad-photo-column" />
           <col className="squad-player-column" />
+          <col className="squad-average-column" />
           <col className="squad-role-column" />
           <col className="squad-money-column" />
           <col className="squad-money-column" />
@@ -74,6 +79,7 @@ export function SquadTable({
           <tr>
             <th className="squad-photo-col" aria-label="Player photo" />
             <th>Player</th>
+            <th className="col-num">Average</th>
             <th className="squad-role-col">Role</th>
             <th className="squad-money-cell">
               <span className="squad-money-content">Bought</span>
@@ -127,6 +133,7 @@ export function SquadTable({
                     ) : null}
                   </span>
                 </td>
+                <td className="col-num num">{averages.data?.has(h.playerId) ? averages.data.get(h.playerId)!.toFixed(1) : "—"}</td>
                 <td className="squad-role-col">
                   {h.player ? (
                     <RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} />

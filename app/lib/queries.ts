@@ -221,6 +221,13 @@ export function useLadder(seasonId: string | undefined) {
   });
 }
 
+export interface OwnershipCount {
+  round_id: string;
+  player_id: string;
+  selected_count: number;
+  team_count: number;
+}
+
 export function useTeamValues(teamIds: string[]) {
   return useQuery({
     queryKey: ["team-values", [...teamIds].sort().join(",")],
@@ -329,6 +336,47 @@ export function usePlayers(seasonId: string | undefined) {
           movement,
         };
       });
+    },
+  });
+}
+
+/** Fantasy points per played match, excluding DNP score rows. */
+export function usePlayerAverages(seasonId: string | undefined) {
+  return useQuery({
+    queryKey: ["player-averages", seasonId],
+    enabled: !!seasonId,
+    staleTime: STALE,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const rows = unwrap<{
+        id: string;
+        player_match_scores: { played: boolean; base: number }[];
+      }[]>(
+        await supabase.from("players")
+          .select("id,player_match_scores(played,base)")
+          .eq("season_id", seasonId!),
+      );
+      return new Map(rows.flatMap((row) => {
+        const played = row.player_match_scores.filter((score) => score.played);
+        return played.length
+          ? [[row.id, played.reduce((sum, score) => sum + score.base, 0) / played.length] as const]
+          : [];
+      }));
+    },
+  });
+}
+
+/** Aggregate ownership only; no other team's individual squad is exposed. */
+export function useOwnershipCounts(roundIds: string[], playerId?: string) {
+  return useQuery({
+    queryKey: ["ownership-counts", [...roundIds].sort().join(","), playerId ?? "all"],
+    enabled: roundIds.length > 0,
+    staleTime: 15_000,
+    queryFn: async (): Promise<OwnershipCount[]> => {
+      let query = supabase.from("player_selection_popularity")
+        .select("round_id,player_id,selected_count,team_count")
+        .in("round_id", roundIds);
+      if (playerId) query = query.eq("player_id", playerId);
+      return unwrap<OwnershipCount[]>(await query);
     },
   });
 }

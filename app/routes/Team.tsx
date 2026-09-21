@@ -260,6 +260,7 @@ export function Team() {
           ) : null}
 
           <SquadTable
+            seasonId={seasonId}
             holdings={state.holdings}
             captainId={captaincy?.captainId ?? null}
             viceCaptainId={captaincy?.viceCaptainId ?? null}

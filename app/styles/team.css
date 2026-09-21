@@ -141,11 +141,12 @@
 
 /* ── squad table ──────────────────────────────────────────────────────────── */
 .squad-table {
-  min-width: 58rem;
+  min-width: 64rem;
   table-layout: fixed;
 }
 .squad-table .squad-photo-column { width: 3.5rem; }
 .squad-table .squad-player-column { width: auto; }
+.squad-table .squad-average-column { width: 6rem; }
 .squad-table .squad-role-column { width: 5.5rem; }
 .squad-table .squad-money-column { width: 7.5rem; }
 .squad-table .squad-change-column { width: 8rem; }

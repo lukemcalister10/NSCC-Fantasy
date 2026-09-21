@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   usePlayer,
   usePlayerSelectionPopularity,
+  useOwnershipCounts,
   useSeason,
   type PlayerProfile as Profile,
 } from "../lib/queries";
@@ -100,6 +101,9 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
     activeRound ?? [...(rounds.data ?? [])].sort((a, b) => b.seq - a.seq)[0];
   const availability = usePlayerAvailability(activeRound?.id);
   const popularity = usePlayerSelectionPopularity(popularityRound?.id, id);
+  const ownership = useOwnershipCounts((rounds.data ?? []).map((round) => round.id), id);
+  const ownershipByRound = new Map(ownership.data?.map((row) => [row.round_id, row]));
+  const roundIdBySeq = new Map(rounds.data?.map((round) => [round.seq, round.id]));
 
   if (query.isLoading) return <Loading />;
   if (query.error) return <ErrorState error={query.error} />;
@@ -223,6 +227,7 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
                     be a row of zeroes explaining nothing. */}
                 {showSecondInnings && <th className="col-num">2nd inns</th>}
                 <th className="col-num col-pts">Pts</th>
+                <th className="col-num">Teams owned</th>
               </tr>
             </thead>
             <tbody>
@@ -256,12 +261,36 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
                       Did not play
                     </td>
                   )}
+                  <td className="col-num num">{(() => {
+                    const roundId = roundIdBySeq.get(s.matches?.rounds?.seq ?? 0);
+                    const count = roundId ? ownershipByRound.get(roundId) : undefined;
+                    return count ? `${count.selected_count} (${Math.round(count.team_count ? count.selected_count / count.team_count * 100 : 0)}%)` : "—";
+                  })()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <h2 className="section-title">Ownership by round</h2>
+      <div className="card table-card">
+        <table className="table">
+          <thead><tr><th>Round</th><th className="col-num">Teams</th><th className="col-num">Selected</th></tr></thead>
+          <tbody>{(rounds.data ?? [])
+            .filter((round) => !activeRound || round.seq <= activeRound.seq)
+            .map((round) => {
+              const count = ownershipByRound.get(round.id);
+              return (
+                <tr key={round.id}>
+                  <td>{round.name}{round.id === activeRound?.id ? " (current)" : ""}</td>
+                  <td className="col-num num">{count?.selected_count ?? "—"}</td>
+                  <td className="col-num num">{count ? `${Math.round(count.team_count ? count.selected_count / count.team_count * 100 : 0)}%` : "—"}</td>
+                </tr>
+              );
+            })}</tbody>
+        </table>
+      </div>
     </div>
   );
 }

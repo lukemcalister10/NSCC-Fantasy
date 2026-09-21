@@ -722,6 +722,24 @@
   cursor: pointer;
   white-space: nowrap;
 }
+.player-list-stat {
+  min-width: 4.5rem;
+  text-align: right;
+  font-weight: 600;
+}
+.player-list-stat span {
+  display: block;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+@media (max-width: 700px) {
+  .player-row { flex-wrap: wrap; }
+  .player-main { flex-basis: calc(100% - 4rem); }
+  .player-list-stat { min-width: 3.8rem; }
+  .player-price { margin-left: auto; }
+  .toolbar .segmented { flex-wrap: wrap; }
+}
 .sortable-ladder .ladder-sort:hover,
 .sortable-ladder .ladder-sort:focus-visible { color: var(--accent); }
 .ladder-owner { color: var(--ink-muted); font-size: var(--fs-xs); font-style: italic; font-weight: 400; }
