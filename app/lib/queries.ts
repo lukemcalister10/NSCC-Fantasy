@@ -44,6 +44,11 @@ export interface LadderRow {
   fantasy_teams: { name: string } | null;
 }
 
+export interface TeamValueRow {
+  fantasy_team_id: string;
+  team_value: number;
+}
+
 export interface LeaderboardRow {
   fantasy_team_id: string;
   total_points: number;
@@ -213,6 +218,21 @@ export function useLadder(seasonId: string | undefined) {
           b.ladder_points - a.ladder_points || b.points_for - a.points_for,
       );
     },
+  });
+}
+
+export function useTeamValues(teamIds: string[]) {
+  return useQuery({
+    queryKey: ["team-values", [...teamIds].sort().join(",")],
+    enabled: teamIds.length > 0,
+    staleTime: STALE,
+    queryFn: async (): Promise<TeamValueRow[]> =>
+      unwrap<TeamValueRow[]>(
+        await supabase
+          .from("team_cap_snapshots")
+          .select("fantasy_team_id,team_value")
+          .in("fantasy_team_id", teamIds),
+      ),
   });
 }
 

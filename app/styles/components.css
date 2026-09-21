@@ -710,6 +710,20 @@
 }
 
 /* ── Rounds & fixtures ── */
+.sortable-ladder { min-width: 690px; }
+.sortable-ladder .ladder-sort {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sortable-ladder .ladder-sort:hover,
+.sortable-ladder .ladder-sort:focus-visible { color: var(--accent); }
 .round-grid {
   display: grid;
   gap: var(--sp-4);
