@@ -446,6 +446,27 @@
 }
 
 /* ── Player list (SuperCoach density) ── */
+.players-table { min-width: 720px; }
+.players-table th, .players-table td { padding-left: var(--sp-2); padding-right: var(--sp-2); }
+.players-table .players-photo-col { width: 3.25rem; padding-right: 0; }
+.players-table td.team-name { min-width: 11rem; }
+.players-table .player-start { display: block; font-weight: 400; }
+.players-table .players-name-link { color: var(--ink); font-weight: 700; }
+.players-table .players-name-link:hover { color: var(--accent); }
+.players-table .players-sort {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.players-table .players-sort:hover,
+.players-table .players-sort:focus-visible { color: var(--accent); }
+.players-table td:last-child .movement { display: block; }
 .player-list {
   display: flex;
   flex-direction: column;
