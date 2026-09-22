@@ -23,6 +23,8 @@ import { activeRoundOf } from "../../lib/teamQueries";
 import {
   setPlayerAvailability,
   usePlayerAvailability,
+  useManualPlayerAvailability,
+  useClubPlayerAvailability,
   type PlayerAvailabilityStatus,
 } from "../../lib/playerAvailability";
 import { PlayerAvailabilityDot } from "../../components/PlayerAvailabilityDot";
@@ -154,6 +156,8 @@ function AvailabilityManager({
 }) {
   const qc = useQueryClient();
   const availability = usePlayerAvailability(round?.id);
+  const manual = useManualPlayerAvailability(round?.id);
+  const club = useClubPlayerAvailability(round?.id);
   const mutation = useMutation({
     mutationFn: ({
       playerId,
@@ -163,7 +167,7 @@ function AvailabilityManager({
       status: PlayerAvailabilityStatus | null;
     }) => setPlayerAvailability(round!.id, playerId, status),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["player-availability", round?.id] }),
+      qc.invalidateQueries({ queryKey: ["player-availability"] }),
   });
 
   if (!round) {
@@ -177,9 +181,13 @@ function AvailabilityManager({
   return (
     <Section title={`Player availability · ${round.name}`}>
       <p className="admin-help">
-        Green means playing, red means not playing, and no dot means not set. These
-        indicators clear automatically when this round locks.
+        Green means available or named by the club; red means unavailable. No reply
+        or “maybe” shows no dot. The club feed refreshes automatically; your manual
+        Playing/Not playing choice overrides it. Choose Automatic to use the feed again.
+        Indicators move to the next round at lockout.
       </p>
+      {club.error ? <p className="refusal" role="alert">Automatic club availability is unavailable: {club.error.message}. Manual entries still work.</p> : null}
+      {club.data ? <p className="admin-help">Club feed matched {club.data.matchedMatches} of this round&rsquo;s matches. {club.data.unmatched.length} club names were not matched to selectable players.</p> : null}
       {availability.error ? <ErrorState error={availability.error} /> : null}
       {mutation.error ? <ErrorState error={mutation.error} /> : null}
       <div className="card table-card">
@@ -190,6 +198,7 @@ function AvailabilityManager({
           <tbody>
             {players.map((player) => {
               const current = availability.data?.get(player.id);
+              const overridden = manual.data?.has(player.id) ?? false;
               const pending = mutation.isPending && mutation.variables?.playerId === player.id;
               const set = (status: PlayerAvailabilityStatus | null) =>
                 mutation.mutate({ playerId: player.id, status });
@@ -200,31 +209,32 @@ function AvailabilityManager({
                       <PlayerAvatar name={player.display_name} size={32} photoUrl={player.photo_url} />
                       <strong>{player.display_name}</strong>
                       <PlayerAvailabilityDot status={current} />
+                      {overridden ? <small>Manual override</small> : null}
                     </span>
                   </td>
                   <td>
                     <div className="availability-controls" role="group" aria-label={`${player.display_name} availability`}>
                       <button
                         type="button"
-                        className={`availability-choice availability-choice-available${current === "available" ? " availability-choice-active" : ""}`}
-                        aria-pressed={current === "available"}
+                        className={`availability-choice availability-choice-available${overridden && current === "available" ? " availability-choice-active" : ""}`}
+                        aria-pressed={overridden && current === "available"}
                         disabled={pending}
                         onClick={() => set("available")}
                       >Playing</button>
                       <button
                         type="button"
-                        className={`availability-choice availability-choice-unavailable${current === "unavailable" ? " availability-choice-active" : ""}`}
-                        aria-pressed={current === "unavailable"}
+                        className={`availability-choice availability-choice-unavailable${overridden && current === "unavailable" ? " availability-choice-active" : ""}`}
+                        aria-pressed={overridden && current === "unavailable"}
                         disabled={pending}
                         onClick={() => set("unavailable")}
                       >Not playing</button>
                       <button
                         type="button"
-                        className={`availability-choice${current === undefined ? " availability-choice-active" : ""}`}
-                        aria-pressed={current === undefined}
+                        className={`availability-choice${!overridden ? " availability-choice-active" : ""}`}
+                        aria-pressed={!overridden}
                         disabled={pending}
                         onClick={() => set(null)}
-                      >Clear</button>
+                      >Automatic</button>
                     </div>
                   </td>
                 </tr>
