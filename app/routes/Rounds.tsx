@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSeason, useRounds, type RoundView } from "../lib/queries";
 import { useH2hResults, type H2hResultRow } from "../lib/teamQueries";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { dateTime } from "../lib/format";
 import { useAuth } from "../auth/AuthProvider";
+import { FixtureBreakdown } from "../components/FixtureBreakdown";
+import { latestLockedSquadRound } from "../lib/fixtureSnapshots";
 import "../styles/team.css";
 
 type RoundStatus = "completed" | "current" | "scheduled";
@@ -87,12 +89,17 @@ function RoundCard({
   status,
   results,
   userId,
+  seasonId,
+  snapshotRound,
 }: {
   round: RoundView;
   status: RoundStatus;
   results: H2hResultRow[];
   userId: string | undefined;
+  seasonId: string;
+  snapshotRound: RoundView | undefined;
 }) {
+  const [expandedFixture, setExpandedFixture] = useState<string | null>(null);
   const { byFixture, disagreement } = useMemo(
     () => resultsFor(round.fixtures, results),
     [round.fixtures, results],
@@ -143,8 +150,14 @@ function RoundCard({
             <ul className="fixture-list">
               {round.fixtures.map((f, i) => {
                 const result = byFixture.get(pairKey(f.homeId, f.awayId));
+                const fixtureKey = pairKey(f.homeId, f.awayId);
+                const canExpand = status !== "scheduled";
                 return (
                   <li key={i} className="fixture-item">
+                    <button type="button" className="fixture-row" disabled={!canExpand}
+                      aria-expanded={canExpand ? expandedFixture === fixtureKey : undefined}
+                      aria-label={`${f.home} versus ${f.away ?? "bye"}${canExpand ? ", show squads" : ""}`}
+                      onClick={() => setExpandedFixture((current) => current === fixtureKey ? null : fixtureKey)}>
                     {f.away === null ? (
                       <>
                         <span
@@ -195,6 +208,20 @@ function RoundCard({
                         ) : null}
                       </>
                     )}
+                    {canExpand ? <span className="fixture-unfurl" aria-hidden="true">{expandedFixture === fixtureKey ? "−" : "+"}</span> : null}
+                    </button>
+                    {canExpand && expandedFixture === fixtureKey ? <FixtureBreakdown
+                      seasonId={seasonId}
+                      round={round}
+                      snapshotRound={snapshotRound}
+                      homeId={f.homeId}
+                      awayId={f.awayId}
+                      homeName={f.home}
+                      awayName={f.away}
+                      completed={status === "completed"}
+                      homePoints={result?.homePoints}
+                      awayPoints={result?.awayPoints}
+                    /> : null}
                   </li>
                 );
               })}
@@ -284,6 +311,8 @@ export function Rounds() {
               }
               results={resultsByRound.get(r.id) ?? []}
               userId={session?.user.id}
+              seasonId={season.data!.id}
+              snapshotRound={latestLockedSquadRound(rounds.data, r.seq)}
             />
           ))}
         </div>

@@ -871,10 +871,30 @@
 .match-grade { font-weight: 700; }
 .match-v { color: var(--ink-faint); text-align: center; }
 .fixture-item {
-  grid-template-columns: minmax(0, 1fr) 1.5rem minmax(0, 1fr) auto;
-  padding: var(--sp-2);
+  display: block;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+}
+.fixture-row { display: grid; grid-template-columns: minmax(0, 1fr) 1.5rem minmax(0, 1fr) auto auto; align-items: center; gap: var(--sp-2); width: 100%; padding: var(--sp-2); border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fixture-row:hover:not(:disabled), .fixture-row[aria-expanded="true"] { background: var(--surface-subtle); }
+.fixture-row:disabled { cursor: default; }
+.fixture-unfurl { color: var(--accent); font-size: var(--fs-lg); font-weight: 700; }
+.fixture-snapshot { padding: var(--sp-3); border-top: 1px solid var(--border); background: var(--surface-subtle); }
+.fixture-snapshot-note { margin: 0 0 var(--sp-2); color: var(--ink-muted); font-size: var(--fs-xs); }
+.fixture-snapshot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.fixture-squad-side { min-width: 0; padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.fixture-squad-side h4 { display: flex; justify-content: space-between; gap: var(--sp-2); margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+.fixture-squad-group { margin: var(--sp-2) 0 var(--sp-1); color: var(--ink-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; }
+.fixture-squad-player { display: flex; align-items: center; gap: var(--sp-1); min-height: 38px; border-bottom: 1px solid var(--border); font-size: var(--fs-xs); }
+.fixture-squad-player:last-child { border-bottom: 0; }
+.fixture-squad-player a { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; flex: 1; color: var(--ink); font-weight: 600; }
+.fixture-squad-player a span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fixture-squad-flags { color: var(--accent); white-space: nowrap; font-size: 10px; }
+.fixture-squad-dropped { opacity: 0.58; }
+.fixture-squad-player > strong { min-width: 25px; text-align: right; }
+@media (max-width: 640px) {
+  .fixture-snapshot-grid { grid-template-columns: 1fr; }
+  .fixture-row { gap: var(--sp-1); }
 }
 .fixture-team-block { min-width: 0; padding: var(--sp-1) var(--sp-2); }
 .fixture-team-block strong,
