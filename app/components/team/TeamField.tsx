@@ -35,20 +35,26 @@ export function TeamField({ players, onSetCaptain, onSetViceCaptain, disabledRea
         <div className="team-field-players">
           {sorted.map((player) => <div className="team-field-card" key={player.id}>
             <Link to={`/players/${player.id}`} state={{ backgroundLocation: location }} className="team-field-player-link">
-              <PlayerAvatar name={player.name} size={64} photoUrl={player.photoUrl} />
+              <PlayerAvatar name={player.name} size={52} photoUrl={player.photoUrl} />
               <span className="team-field-player-name">{player.name}<PlayerAvailabilityDot status={player.availability} /></span>
             </Link>
-            <span className="team-field-meta"><strong>{player.role}</strong><span className="num">{money(player.price)}</span></span>
-            {onSetCaptain && onSetViceCaptain ? (
-              <div className="captain-selector team-field-captain" role="group" aria-label={`Captaincy for ${player.name}`}>
-                <button type="button" className={`captain-choice${player.captain ? " captain-choice-active" : ""}`}
-                  aria-pressed={player.captain} disabled={!!disabledReason} onClick={() => onSetCaptain(player.id)}>CAPT</button>
-                <button type="button" className={`captain-choice${player.viceCaptain ? " captain-choice-active" : ""}`}
-                  aria-pressed={player.viceCaptain} disabled={!!disabledReason || player.captain} onClick={() => onSetViceCaptain(player.id)}>VICE</button>
-              </div>
-            ) : player.captain || player.viceCaptain ? (
-              <span className="team-field-captain-label">{player.captain ? "Captain" : "Vice-captain"}</span>
-            ) : null}
+            <div className="team-field-details">
+              <span className="team-field-meta"><strong>{player.role}</strong><span className="num">{money(player.price)}</span></span>
+              {onSetCaptain && onSetViceCaptain ? (
+                <div className="captain-selector team-field-captain" role="group" aria-label={`Captaincy for ${player.name}`}>
+                  <button type="button" className={`captain-choice${player.captain ? " captain-choice-active" : ""}`}
+                    aria-label={`Make ${player.name} captain`} title="Captain" aria-pressed={player.captain}
+                    disabled={!!disabledReason} onClick={() => onSetCaptain(player.id)}>C</button>
+                  <button type="button" className={`captain-choice${player.viceCaptain ? " captain-choice-active" : ""}`}
+                    aria-label={`Make ${player.name} vice-captain`} title="Vice-captain" aria-pressed={player.viceCaptain}
+                    disabled={!!disabledReason || player.captain} onClick={() => onSetViceCaptain(player.id)}>V</button>
+                </div>
+              ) : player.captain || player.viceCaptain ? (
+                <span className="team-field-captain-label" title={player.captain ? "Captain" : "Vice-captain"}>
+                  {player.captain ? "C" : "VC"}
+                </span>
+              ) : null}
+            </div>
           </div>)}
         </div>
       </div>
