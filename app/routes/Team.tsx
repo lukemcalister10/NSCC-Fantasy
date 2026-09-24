@@ -24,6 +24,7 @@ import {
   TradeBudgetNotice,
 } from "../components/team/TeamChrome";
 import { PoolPicker, SquadTable } from "../components/team/SquadPicker";
+import { TeamField } from "../components/team/TeamField";
 import { TeamNameEditor } from "../components/team/TeamNameEditor";
 import { money } from "../lib/format";
 import type { PoolPlayer } from "../lib/teamQueries";
@@ -66,6 +67,7 @@ export function Team() {
 
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
+  const [squadView, setSquadView] = useState<"list" | "field">("list");
 
   // ── captaincy for the open round, carried forward ─────────────────────────
   const captaincy = useMemo<Captaincy | null>(
@@ -259,7 +261,25 @@ export function Team() {
             </div>
           ) : null}
 
-          <SquadTable
+          <div className="squad-view-toggle" role="group" aria-label="Squad view">
+            <button type="button" className={squadView === "list" ? "squad-view-active" : ""} aria-pressed={squadView === "list"} onClick={() => setSquadView("list")}>List</button>
+            <button type="button" className={squadView === "field" ? "squad-view-active" : ""} aria-pressed={squadView === "field"} onClick={() => setSquadView("field")}>Field</button>
+          </div>
+          {squadView === "field" ? <TeamField
+            players={state.holdings.filter((holding) => holding.player).map((holding) => ({
+              id: holding.playerId,
+              name: holding.player!.display_name,
+              role: holding.player!.role,
+              photoUrl: holding.player!.photo_url,
+              price: holding.currentPrice,
+              captain: captaincy?.captainId === holding.playerId,
+              viceCaptain: captaincy?.viceCaptainId === holding.playerId,
+              availability: state.availability.get(holding.playerId),
+            }))}
+            disabledReason={captaincyDisabledReason}
+            onSetCaptain={(playerId) => void changeCaptaincy({ captainId: playerId, viceCaptainId: captaincy?.viceCaptainId === playerId ? null : (captaincy?.viceCaptainId ?? null) })}
+            onSetViceCaptain={(playerId) => void changeCaptaincy({ captainId: captaincy?.captainId ?? playerId, viceCaptainId: playerId })}
+          /> : <SquadTable
             seasonId={seasonId}
             holdings={state.holdings}
             captainId={captaincy?.captainId ?? null}
@@ -281,7 +301,7 @@ export function Team() {
                 viceCaptainId: playerId,
               })
             }
-          />
+          />}
         </>
       )}
     </div>

@@ -1,10 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 import { useLadder, usePlayers, useSeason, useTeamOwners, useTeamValues } from "../lib/queries";
 import { useSeasonRounds, useTeamSelections } from "../lib/teamQueries";
-import { PlayerAvatar } from "../components/PlayerAvatar";
-import { RoleBadge } from "../components/RoleBadge";
 import { EmptyState, ErrorState, Loading } from "../components/states";
 import { money } from "../lib/format";
+import { TeamField } from "../components/team/TeamField";
 
 export function FantasyTeamProfile() {
   const { id } = useParams<{ id: string }>();
@@ -54,17 +53,15 @@ export function FantasyTeamProfile() {
       {!lastLocked ? <EmptyState>No round has locked yet.</EmptyState> : squad.length === 0 ? (
         <EmptyState>No locked selection recorded for this team.</EmptyState>
       ) : (
-        <div className="card table-card">
-          <table className="table team-profile-squad">
-            <thead><tr><th>Player</th><th>Role</th><th className="col-num">Current price</th><th>Captaincy</th></tr></thead>
-            <tbody>{squad.map((selection) => <tr key={selection.player_id}>
-              <td><Link to={`/players/${selection.player_id}`} className="team-profile-player"><PlayerAvatar name={selection.player!.display_name} photoUrl={selection.player!.photo_url} size={42} />{selection.player!.display_name}</Link></td>
-              <td><RoleBadge role={selection.player!.role} wkEligible={selection.player!.wk_eligible} /></td>
-              <td className="col-num num">{money(selection.player!.currentPrice)}</td>
-              <td>{selection.is_captain ? "Captain" : selection.is_vice_captain ? "Vice-captain" : ""}</td>
-            </tr>)}</tbody>
-          </table>
-        </div>
+        <TeamField players={squad.map((selection) => ({
+          id: selection.player_id,
+          name: selection.player!.display_name,
+          role: selection.player!.role,
+          photoUrl: selection.player!.photo_url,
+          price: selection.player!.currentPrice,
+          captain: selection.is_captain,
+          viceCaptain: selection.is_vice_captain,
+        }))} />
       )}
     </div>
   );
