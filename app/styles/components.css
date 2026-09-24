@@ -448,7 +448,8 @@
 /* ── Player list (SuperCoach density) ── */
 .players-table { min-width: 720px; }
 .players-table th, .players-table td { padding-left: var(--sp-2); padding-right: var(--sp-2); }
-.players-table .players-photo-col { width: 3.25rem; padding-right: 0; }
+.players-table .players-photo-col { width: 4.5rem; padding-right: 0; }
+.players-table tbody .players-photo-col { padding-top: 3px; padding-bottom: 3px; }
 .players-table td.team-name { min-width: 11rem; }
 .players-table .player-start { display: block; font-weight: 400; }
 .players-table .players-name-link { color: var(--ink); font-weight: 700; }
@@ -536,9 +537,22 @@
   gap: var(--sp-4);
   padding: var(--sp-5);
 }
+.profile-summary { flex: 1; min-width: 0; }
+.profile-title-row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--sp-3); }
+.profile-id { min-width: 0; }
 .profile-name {
   font-size: var(--fs-lg);
   font-weight: 700;
+  margin: 0 0 var(--sp-2);
+}
+.profile-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.profile-price-label, .profile-facts dt { color: var(--ink-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+.profile-price strong { font-size: var(--fs-lg); line-height: 1.25; }
+.profile-facts { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin: var(--sp-4) 0 0; }
+.profile-facts div { display: flex; flex-direction: column; gap: 2px; }
+.profile-facts dd { margin: 0; font-size: var(--fs-sm); font-weight: 700; }
+@media (max-width: 520px) {
+  .profile-head { flex-direction: column; align-items: stretch; padding: var(--sp-4); }
 }
 
 .player-modal-backdrop {
@@ -596,9 +610,6 @@
     max-height: 92dvh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
-}
-.profile-role {
-  margin-top: var(--sp-2);
 }
 .statline {
   display: flex;

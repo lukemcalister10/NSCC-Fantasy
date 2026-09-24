@@ -120,7 +120,7 @@ export function Players() {
             </tr></thead>
             <tbody>{rows.map((p) => (
               <tr key={p.id}>
-                <td className="players-photo-col"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} aria-label={`View ${p.display_name}`}><PlayerAvatar name={p.display_name} size={36} photoUrl={p.photo_url} /></Link></td>
+                <td className="players-photo-col"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} aria-label={`View ${p.display_name}`}><PlayerAvatar name={p.display_name} size={54} photoUrl={p.photo_url} /></Link></td>
                 <td className="team-name">
                   <span className="squad-player-name-row"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} className="players-name-link">{p.display_name}</Link><PlayerAvailabilityDot status={availability.data?.get(p.id)} /></span>
                   <span className="player-start">from {money(p.starting_price)}</span>

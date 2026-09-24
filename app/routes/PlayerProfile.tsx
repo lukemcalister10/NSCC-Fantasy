@@ -9,7 +9,6 @@ import {
 import { RoleBadge } from "../components/RoleBadge";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { PriceMovement } from "../components/PriceMovement";
-import { BroadcastPanel } from "../components/BroadcastPanel";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { money, shortDate } from "../lib/format";
 import { previousSeasonFor, type PreviousSeasonLine } from "../lib/previousSeason";
@@ -132,46 +131,29 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
       ) : null}
 
       <div className="profile-head card">
-        <PlayerAvatar name={p.display_name} size={72} photoUrl={p.photo_url} />
-        <div className="profile-id">
-          <h1 className="profile-name">
-            {p.display_name} <PlayerAvailabilityDot status={availability.data?.get(p.id)} />
-          </h1>
-          <div className="profile-role">
-            <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
+        <PlayerAvatar name={p.display_name} size={108} photoUrl={p.photo_url} />
+        <div className="profile-summary">
+          <div className="profile-title-row">
+            <div className="profile-id">
+              <h1 className="profile-name">
+                {p.display_name} <PlayerAvailabilityDot status={availability.data?.get(p.id)} />
+              </h1>
+              <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
+            </div>
+            <div className="profile-price num">
+              <span className="profile-price-label">Current price</span>
+              <strong>{money(p.currentPrice)}</strong>
+            </div>
           </div>
+          <dl className="profile-facts">
+            <div><dt>Matches</dt><dd className="num">{played}</dd></div>
+            <div><dt>Season points</dt><dd className="num">{totalPoints(p)}</dd></div>
+            <div><dt>Season average</dt><dd className="num">{played ? (totalPoints(p) / played).toFixed(1) : "—"}</dd></div>
+            <div><dt>Price change</dt><dd className="num"><PriceMovement delta={overallMove} /></dd></div>
+            <div><dt>Ownership</dt><dd className="num">{popularity.isLoading ? "—" : `${Math.round(popularity.data?.percentage ?? 0)}%`}</dd></div>
+          </dl>
         </div>
       </div>
-
-      {/* Score/price readout — reserved broadcast treatment. */}
-      <BroadcastPanel className="statline">
-        <div className="stat">
-          <span className="stat-label">Current price</span>
-          <span className="stat-value num">{money(p.currentPrice)}</span>
-          <PriceMovement delta={overallMove} />
-        </div>
-        <div className="stat">
-          <span className="stat-label">Season points</span>
-          <span className="stat-value num">{totalPoints(p)}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Matches played</span>
-          <span className="stat-value num">{played}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Selected in teams</span>
-          <span className="stat-value num">
-            {popularity.isLoading
-              ? "—"
-              : `${Math.round(popularity.data?.percentage ?? 0)}%`}
-          </span>
-          {popularity.data ? (
-            <span className="stat-detail num">
-              {popularity.data.selectedCount} of {popularity.data.teamCount}
-            </span>
-          ) : null}
-        </div>
-      </BroadcastPanel>
 
       {previousSeason ? <PreviousSeasonStats lines={previousSeason.seasons} /> : null}
 
