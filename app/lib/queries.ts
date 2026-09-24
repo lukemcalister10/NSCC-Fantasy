@@ -305,22 +305,21 @@ function latestAndMovement(history: { seq: number; price: number }[]): {
   return { current, movement: current - prev };
 }
 
-export function usePlayers(seasonId: string | undefined) {
+export function usePlayers(seasonId: string | undefined, includeInactive = false) {
   return useQuery({
-    queryKey: ["players", seasonId],
+    queryKey: ["players", seasonId, includeInactive],
     enabled: !!seasonId,
     staleTime: STALE,
     queryFn: async (): Promise<PlayerListItem[]> => {
-      const rows = unwrap<PlayerWithPrices[]>(
-        await supabase
+      let query = supabase
           .from("players")
           .select(
             "id,display_name,role,wk_eligible,starting_price,photo_path,price_history(seq,price)",
           )
           .eq("season_id", seasonId!)
-          .eq("active", true)
-          .order("display_name"),
-      );
+          .order("display_name");
+      if (!includeInactive) query = query.eq("active", true);
+      const rows = unwrap<PlayerWithPrices[]>(await query);
       const photoUrls = await signPlayerPhotoPaths(rows.map((p) => p.photo_path));
       return rows.map((p) => {
         const { current, movement } = latestAndMovement(p.price_history ?? []);

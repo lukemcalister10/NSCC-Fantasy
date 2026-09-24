@@ -16,6 +16,7 @@ import { Players } from "./routes/Players";
 import { PlayerProfile } from "./routes/PlayerProfile";
 import { Rounds } from "./routes/Rounds";
 import { Team } from "./routes/Team";
+import { FantasyTeamProfile } from "./routes/FantasyTeamProfile";
 import { Trades } from "./routes/Trades";
 import { Help } from "./routes/Help";
 import { AdminHome } from "./routes/admin/AdminHome";
@@ -57,6 +58,7 @@ export function App() {
           <Route path="/players/:id" element={<PlayerProfile />} />
           <Route path="/rounds" element={<Rounds />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/teams/:id" element={<FantasyTeamProfile />} />
           <Route path="/team/trades" element={<Trades />} />
           <Route path="/help" element={<Help />} />
           <Route element={<RequireManager />}>

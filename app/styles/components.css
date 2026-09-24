@@ -775,6 +775,14 @@
 .sortable-ladder .ladder-sort:hover,
 .sortable-ladder .ladder-sort:focus-visible { color: var(--accent); }
 .ladder-owner { color: var(--ink-muted); font-size: var(--fs-xs); font-style: italic; font-weight: 400; }
+.team-profile-link { color: var(--ink); font-weight: 700; }
+.team-profile-link:hover { color: var(--accent); }
+.team-profile-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: var(--sp-3); }
+.team-profile-facts .card { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-3) var(--sp-4); }
+.team-profile-facts span { color: var(--ink-muted); font-size: var(--fs-xs); text-transform: uppercase; }
+.team-profile-facts strong { font-size: var(--fs-lg); }
+.team-profile-squad { min-width: 530px; }
+.team-profile-player { display: flex; align-items: center; gap: var(--sp-3); color: var(--ink); font-weight: 700; }
 .round-grid {
   display: grid;
   gap: var(--sp-4);

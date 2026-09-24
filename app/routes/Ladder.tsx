@@ -1,4 +1,5 @@
 import { useSeason, useLeaderboard } from "../lib/queries";
+import { Link } from "react-router-dom";
 import { BroadcastPanel } from "../components/BroadcastPanel";
 import { SortableLadder } from "../components/SortableLadder";
 import { Loading, ErrorState, EmptyState } from "../components/states";
@@ -54,7 +55,7 @@ export function Ladder() {
               {board.data.map((row, i) => (
                 <tr key={row.fantasy_team_id}>
                   <td className="col-rank num">{i + 1}</td>
-                  <td className="team-name">{row.fantasy_teams?.name ?? "—"}</td>
+                  <td className="team-name"><Link className="team-profile-link" to={`/teams/${row.fantasy_team_id}`}>{row.fantasy_teams?.name ?? "—"}</Link></td>
                   <td className="col-num num col-pts">
                     <span className="score-chip">{row.total_points}</span>
                   </td>

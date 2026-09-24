@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useLadder, useTeamOwners, useTeamValues, type LadderRow } from "../lib/queries";
 import { money } from "../lib/format";
 import { Loading, ErrorState, EmptyState } from "./states";
@@ -76,7 +77,7 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
         <tbody>{rows.map((row, index) => (
           <tr key={row.fantasy_team_id}>
             <td className="col-rank num">{index + 1}</td>
-            <td className="team-name">{row.fantasy_teams?.name ?? "—"}{owners.data?.get(row.fantasy_team_id) ? <span className="ladder-owner"> — {owners.data.get(row.fantasy_team_id)}</span> : null}</td>
+            <td className="team-name"><Link className="team-profile-link" to={`/teams/${row.fantasy_team_id}`}>{row.fantasy_teams?.name ?? "—"}</Link>{owners.data?.get(row.fantasy_team_id) ? <span className="ladder-owner"> — {owners.data.get(row.fantasy_team_id)}</span> : null}</td>
             <td className="col-num num">{row.played}</td>
             <td className="col-num num">{row.wins}</td>
             <td className="col-num num">{row.losses}</td>
