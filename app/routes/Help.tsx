@@ -1,5 +1,6 @@
 import { ErrorState, Loading } from "../components/states";
 import { money } from "../lib/format";
+import { NSCC_2026_27_SEASON_ID } from "../../src/recompute/roundScoringPolicy";
 import { useSeason } from "../lib/queries";
 import { useLeagueConfig } from "../lib/teamQueries";
 import type { ScoringConfig } from "../../src/config/types";
@@ -122,6 +123,9 @@ export function Help() {
         <summary>How are points scored?</summary>
         <div className="help-card-body">
           <p>Points are calculated from each player&apos;s match scorecard.</p>
+          {season.data?.id === NSCC_2026_27_SEASON_ID ? (
+            <p>Round 1 counted all nine players. From Round 2, your best eight individual scores count each round. The captain&apos;s score is then added once more, even if their individual score was the one dropped.</p>
+          ) : null}
           <Scoring scoring={scoring} />
         </div>
       </details>
@@ -144,7 +148,7 @@ export function Help() {
       <details className="card help-card">
         <summary>How do captains work?</summary>
         <div className="help-card-body">
-          <p>Your captain scores double. If the captain does not play, the vice-captain scores double instead. If neither plays, nobody receives double points.</p>
+          <p>Your captain&apos;s score is added once more. If the captain does not play, the vice-captain receives that bonus instead. Playing and scoring zero still counts as playing. If neither plays, nobody receives a bonus.</p>
           <p>Your selections carry into the next round unless you change them.</p>
         </div>
       </details>

@@ -195,12 +195,13 @@ export type H2hOutcome = "home" | "away" | "tie" | "bye";
 /**
  * Per-team round total (D10 captaincy applied HERE, not in scoreMatch): sum of
  * the selected players' round-base (Σ pre-captaincy `base` over the round's
- * matches), with the effective captain's round-base counted twice.
+ * matches), optionally retaining only the best eight individual scores, with
+ * the effective captain's round-base added independently.
  */
 export interface DerivedTeamRoundScore {
   fantasyTeamId: string;
   roundId: string;
-  /** Σ selected round-bases + effective-captain round-base (the ×2). */
+  /** Σ counted individual round-bases + effective-captain round-base. */
   total: number;
   /** The player who actually received the ×2, or null if C and VC both DNP. */
   captainPlayerId: string | null;

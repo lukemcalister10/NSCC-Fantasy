@@ -6,6 +6,7 @@ import { computeH2hResults } from "./h2h.js";
 import { computeLadder } from "./ladder.js";
 import { computeOverallLeaderboard } from "./overallLeaderboard.js";
 import { computeTeamRoundScores } from "./teamRoundScoring.js";
+import { countedPlayersForRound } from "./roundScoringPolicy.js";
 import type {
   DerivedCapSnapshot,
   DerivedPlayerMatchScore,
@@ -184,6 +185,10 @@ export function recomputeSeason(raw: RawSeason): DerivedState {
   const teamRoundScores = computeTeamRoundScores({
     teamIds,
     roundIds: activeRoundIdsBySeq,
+    countedPlayersByRound: new Map(activeRoundsBySeq.flatMap((round) => {
+      const count = countedPlayersForRound(raw.seasonId, round.seq);
+      return count === undefined ? [] : [[round.id, count] as const];
+    })),
     selections: raw.selections,
     playerMatchScores,
     roundIdByMatch,

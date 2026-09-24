@@ -11,8 +11,11 @@ import type {
  * `selections.is_captain / is_vice_captain`, never by any scorecard captain
  * field. `base` (pre-captaincy) still drives pricing (D1/G7) untouched.
  *
- *   team round total = Σ (selected player's round-base)
- *                      + effective-captain's round-base    (the ×2)
+ *   team round total = Σ counted individual round-bases
+ *                      + effective-captain's round-base
+ * Round 1 (and other seasons) counts all selected players. From Round 2 of
+ * NSCC Fantasy 2026/27, only the best eight individual scores count. The
+ * captain bonus is independent of that ranking, even when negative.
  *
  * where round-base = Σ `base` over the round's matches the player has a score
  * row in. Effective captain (D10): the is_captain selection IF that player
@@ -36,12 +39,43 @@ export interface TeamRoundInput {
   playerMatchScores: DerivedPlayerMatchScore[];
   /** match_id → round_id, for mapping scores into rounds. */
   roundIdByMatch: Map<string, string>;
+  /** Rounds using best-N individual scores. Omitted rounds retain all scores. */
+  countedPlayersByRound?: Map<string, number>;
+}
+
+export interface TeamRoundPlayerContribution {
+  playerId: string;
+  base: number;
+  played: boolean;
+  isCaptain: boolean;
+  isViceCaptain: boolean;
+}
+
+/** Shared arithmetic for recompute and the eventual fixture score breakdown. */
+export function scoreTeamRound(
+  players: TeamRoundPlayerContribution[],
+  countedPlayers: number | undefined,
+): { total: number; captainPlayerId: string | null; droppedPlayerIds: string[] } {
+  const ranked = [...players].sort((a, b) =>
+    b.base - a.base || Number(b.played) - Number(a.played) || cmp(a.playerId, b.playerId));
+  const limit = countedPlayers === undefined ? ranked.length : Math.max(0, countedPlayers);
+  const counted = ranked.slice(0, limit);
+  const droppedPlayerIds = ranked.slice(limit).map((player) => player.playerId);
+  const captain = players.find((player) => player.isCaptain);
+  const vice = players.find((player) => player.isViceCaptain);
+  const effectiveCaptain = captain?.played ? captain : vice?.played ? vice : null;
+  return {
+    total: counted.reduce((sum, player) => sum + player.base, 0) +
+      (effectiveCaptain?.base ?? 0),
+    captainPlayerId: effectiveCaptain?.playerId ?? null,
+    droppedPlayerIds,
+  };
 }
 
 export function computeTeamRoundScores(
   input: TeamRoundInput,
 ): DerivedTeamRoundScore[] {
-  const { teamIds, roundIds, selections, playerMatchScores, roundIdByMatch } =
+  const { teamIds, roundIds, selections, playerMatchScores, roundIdByMatch, countedPlayersByRound } =
     input;
 
   // (roundId,playerId) → Σ base over that round's matches; also tracks presence.
@@ -69,28 +103,19 @@ export function computeTeamRoundScores(
     for (const roundId of roundIds) {
       const sels = selByTeamRound.get(teamId + "|" + roundId) ?? [];
 
-      let total = 0;
-      for (const sel of sels) total += baseInRound(roundId, sel.playerId);
-
-      // Effective captain (D10): captain if it played this round, else VC if it
-      // played, else nobody. Doubling = add the captain's round-base once more.
-      const captainSel = sels.find((s) => s.isCaptain);
-      const viceSel = sels.find((s) => s.isViceCaptain);
-      let effectiveCaptain: string | null = null;
-      if (captainSel && playedInRound(roundId, captainSel.playerId)) {
-        effectiveCaptain = captainSel.playerId;
-      } else if (viceSel && playedInRound(roundId, viceSel.playerId)) {
-        effectiveCaptain = viceSel.playerId;
-      }
-      if (effectiveCaptain !== null) {
-        total += baseInRound(roundId, effectiveCaptain);
-      }
+      const result = scoreTeamRound(sels.map((sel) => ({
+        playerId: sel.playerId,
+        base: baseInRound(roundId, sel.playerId),
+        played: playedInRound(roundId, sel.playerId),
+        isCaptain: sel.isCaptain,
+        isViceCaptain: sel.isViceCaptain,
+      })), countedPlayersByRound?.get(roundId));
 
       out.push({
         fantasyTeamId: teamId,
         roundId,
-        total,
-        captainPlayerId: effectiveCaptain,
+        total: result.total,
+        captainPlayerId: result.captainPlayerId,
       });
     }
   }
