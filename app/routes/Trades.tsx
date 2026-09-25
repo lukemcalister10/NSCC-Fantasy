@@ -1,15 +1,14 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
 import {
-  executeTradePair,
+  executeTradeBatch,
   translateRefusal,
   type Refusal,
 } from "../lib/teamMutations";
 import {
   roleCounts,
   validateComposition,
-  type Holding,
   type RoleCarrier,
 } from "../lib/squad";
 import { Loading, ErrorState, EmptyState } from "../components/states";
@@ -30,21 +29,21 @@ import {
 import { RoleBadge } from "../components/RoleBadge";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 import { money } from "../lib/format";
+import { tradeBatchTotals } from "../lib/tradeBatch";
 import type { PoolPlayer } from "../lib/teamQueries";
 import "../styles/team.css";
 
 /**
- * TRADES (/team/trades). ONE TRADE = ONE SELL + ONE BUY PAIR (G15), bought at the
- * price entering the open round (Rider 2 — see squad.ts). The per-round limit is
- * read from config (O1); nothing here knows what the number is.
+ * TRADES (/team/trades). One trade is one player out and one player in. A draft
+ * can contain several trades, all written in one atomic ledger insertion. The
+ * final roster, not each intermediate pair, is checked against composition.
  *
  * Both directions of the mid-match lock are surfaced (D7/G6): a player whose
  * match has started but is not finalised can be neither bought NOR sold, and the
  * row says so rather than going quietly grey.
  *
- * Write order is LEDGER FIRST, then selections — the ledger is authoritative, so
- * if the second write is lost the squad view detects the divergence and offers a
- * repair that rewrites selections from the ledger.
+ * The statement-level trigger materialises selections from the completed ledger
+ * insert. There is no separate client-side selection write.
  */
 export function Trades() {
   const season = useSeason();
@@ -52,35 +51,14 @@ export function Trades() {
   const seasonLocked = season.data?.locked_at !== null && season.data?.locked_at !== undefined;
   const state = useTeamState(seasonId, seasonLocked);
 
-  const [sellId, setSellId] = useState<string | null>(null);
-  const [buyId, setBuyId] = useState<string | null>(null);
+  const [sellIds, setSellIds] = useState<Set<string>>(() => new Set());
+  const [buyIds, setBuyIds] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
 
   const squad = state.config?.squad;
-
-  const sell = sellId ? state.holdings.find((h) => h.playerId === sellId) : undefined;
-  const buy = buyId ? state.poolById.get(buyId) : undefined;
-
-  /** Holdings as they would stand after this pair — what every check below judges. */
-  const afterHoldings = useMemo<Holding[]>(() => {
-    const base = state.holdings.map((h) => ({
-      playerId: h.playerId,
-      purchasePrice: h.purchasePrice,
-      purchaseRoundId: h.purchaseRoundId,
-    }));
-    if (!sell || !buy || !state.activeRound) return base;
-    return [
-      ...base.filter((h) => h.playerId !== sell.playerId),
-      {
-        playerId: buy.id,
-        purchasePrice: buy.priceEnteringRound ?? 0,
-        purchaseRoundId: state.activeRound.id,
-      },
-    ];
-  }, [state.holdings, sell, buy, state.activeRound]);
 
   if (season.isLoading || state.isLoading) return <Loading />;
   if (season.error) return <ErrorState error={season.error} />;
@@ -112,16 +90,25 @@ export function Trades() {
     );
   }
 
-  const afterCarriers: RoleCarrier[] = afterHoldings
-    .map((h) => state.poolById.get(h.playerId))
+  const budget = state.budget;
+  const maxBatch = Math.min(3, budget?.initialBuild ? squad.tradesPerRound : (budget?.remaining ?? 0));
+  const sells = state.holdings.filter((h) => sellIds.has(h.playerId));
+  const buys = [...buyIds]
+    .map((id) => state.poolById.get(id))
+    .filter((p): p is PoolPlayer => !!p);
+  const { saleProceeds, buyCost, cashAvailable, capAfter } = tradeBatchTotals(
+    state.capRemaining ?? 0,
+    sells.map((h) => h.currentPrice ?? 0),
+    buys.map((p) => p.priceEnteringRound ?? 0),
+  );
+
+  const afterCarriers: RoleCarrier[] = [
+    ...state.holdings.filter((h) => !sellIds.has(h.playerId)).map((h) => h.playerId),
+    ...buyIds,
+  ]
+    .map((id) => state.poolById.get(id))
     .filter((p): p is PoolPlayer => !!p)
     .map((p) => ({ role: p.role, wk_eligible: p.wk_eligible }));
-
-  const sellPrice = sell?.currentPrice ?? 0;
-  const buyPrice = buy?.priceEnteringRound ?? 0;
-  const capAfter = (state.capRemaining ?? 0) + sellPrice - buyPrice;
-  const problems = validateComposition(afterCarriers, squad);
-  const budget = state.budget;
 
   const noTradesLeft =
     budget !== null && !budget.initialBuild && (budget.remaining ?? 0) <= 0;
@@ -133,63 +120,49 @@ export function Trades() {
   );
 
   const blockers: string[] = [];
-  if (state.activeRound === null) blockers.push("Every round has locked (D6/G4).");
+  if (state.activeRound === null) blockers.push("Every round has locked.");
   if (resultsPending)
     blockers.push("Trading reopens when the previous round's results and prices are processed.");
-  if (noTradesLeft)
-    blockers.push(
-      `No trades remaining this round — the limit is ${budget?.limit} (O1, from config).`,
-    );
-  if (sell && sell.midMatchLocked)
-    blockers.push(
-      `${sell.player?.display_name ?? "That player"}'s match is in progress — he cannot be sold until it is finalised or abandoned (D7/G6).`,
-    );
-  if (buy && state.midMatchLocked.has(buy.id))
-    blockers.push(
-      `${buy.display_name}'s match is in progress — he cannot be bought until it is finalised or abandoned (D7/G6).`,
-    );
-  if (sell && buy && capAfter < 0)
-    blockers.push(`That pair goes over the salary cap by ${money(-capAfter)}.`);
-  if (sell && buy) for (const p of problems) blockers.push(p.message);
+  if (noTradesLeft) blockers.push("No trades remaining this round.");
+  if (sellIds.size !== sells.length || buyIds.size !== buys.length)
+    blockers.push("Your squad or player pool has changed. Clear this draft and choose again.");
+  if (buys.some((p) => state.holdings.some((h) => h.playerId === p.id)))
+    blockers.push("A selected trade-in is already in your squad. Clear this draft and choose again.");
+  if (sells.length > maxBatch) blockers.push(`Choose no more than ${maxBatch} trades.`);
+  if (sells.some((h) => h.midMatchLocked) || buys.some((p) => state.midMatchLocked.has(p.id)))
+    blockers.push("A selected player's match is in progress, so they cannot be traded.");
+  if (sells.some((h) => h.currentPrice === null) || buys.some((p) => p.priceEnteringRound === null) || state.capRemaining === null)
+    blockers.push("A current price is unavailable. Please refresh before trading.");
+  if (sells.length > 0 && sells.length === buys.length) {
+    if (capAfter < 0) blockers.push(`These trades exceed your salary cap by ${money(-capAfter)}.`);
+    for (const problem of validateComposition(afterCarriers, squad)) blockers.push(problem.message);
+  }
 
-  const ready = !!sell && !!buy && blockers.length === 0 && !!state.activeRound;
+  const ready = sells.length > 0 && sells.length === buys.length && blockers.length === 0 && !!state.activeRound;
 
   const submit = async () => {
-    if (!sell || !buy || !state.activeRound || !state.team) return;
+    if (!ready || !state.activeRound || !state.team || busy) return;
     setBusy(true);
     setRefusal(null);
     setDone(null);
     const roundId = state.activeRound.id;
     try {
-      // 1. LEDGER (atomic pair: one request, one transaction — the sale funds the
-      //    purchase regardless of row order, exactly as the cap guard expects).
-      await executeTradePair({
+      // One INSERT, one transaction. If any guard refuses, none of the rows land.
+      await executeTradeBatch({
         teamId: state.team.id,
         roundId,
-        sell: { playerId: sell.playerId, price: sellPrice },
-        buy: { playerId: buy.id, price: buyPrice },
+        sells: sells.map((h) => ({ playerId: h.playerId, price: h.currentPrice! })),
+        buys: buys.map((p) => ({ playerId: p.id, price: p.priceEnteringRound! })),
       });
-
-      // 2. SELECTIONS — NOTHING TO DO HERE ANY MORE (D26 / migration 0010).
-      //    The trades insert above fires app.materialise_selections inside its OWN
-      //    transaction, for every open round of this team, carrying captaincy
-      //    forward exactly as resolveCaptaincy would (and promoting if the captain
-      //    was the player just sold, so Rider 1 still holds). This screen used to
-      //    do it in a second request; keeping that would mean two writers of the
-      //    same rows, which D26 rules out — and it is what tripped C7's duplicate
-      //    key. It also means the ledger write and the materialisation are now
-      //    atomic together, which no client round-trip could guarantee (F2/F3).
-
-      setSellId(null);
-      setBuyId(null);
-      setDone(
-        `Traded ${sell.player?.display_name ?? "player"} out for ${buy.display_name} in ${state.activeRound.name}.`,
-      );
-      state.refetch();
+      setSellIds(new Set());
+      setBuyIds(new Set());
+      setDone(`${sells.length} ${sells.length === 1 ? "trade" : "trades"} completed for ${state.activeRound.name}.`);
     } catch (err) {
       setRefusal(translateRefusal(err));
-      state.refetch();
     } finally {
+      // A refresh failure must never be reported as a failed trade: the insert
+      // may already have committed. Keep the submit button locked until refreshed.
+      await state.refetch().catch(() => {});
       setBusy(false);
     }
   };
@@ -202,24 +175,46 @@ export function Trades() {
   );
 
   const chooseTradeOut = (playerId: string) => {
-    if (sellId === playerId) {
-      setSellId(null);
+    if (busy) return;
+    setDone(null);
+    setRefusal(null);
+    const next = new Set(sellIds);
+    if (next.has(playerId)) next.delete(playerId);
+    else if (next.size < maxBatch) next.add(playerId);
+    setSellIds(next);
+
+    // Keep the existing one-for-one role shortcut; once several players are
+    // moving together, show every role so valid cross-role batches stay visible.
+    if (next.size === 1) {
+      const onlyId = [...next][0]!;
+      const player = state.poolById.get(onlyId);
+      const counts = roleCounts(state.holdings
+        .map((holding) => state.poolById.get(holding.playerId))
+        .filter((candidate): candidate is PoolPlayer => !!candidate));
+      const isFlexPlayer = player && counts[player.role] > (squad.roleMinimums[player.role] ?? 0);
+      setRoleFilter(player && !isFlexPlayer ? player.role : "ALL");
+    } else {
       setRoleFilter("ALL");
-      return;
     }
+  };
 
-    const player = state.poolById.get(playerId);
-    const carriers = state.holdings
-      .map((holding) => state.poolById.get(holding.playerId))
-      .filter((candidate): candidate is PoolPlayer => !!candidate);
-    const counts = roleCounts(carriers);
-    const isFlexPlayer = player
-      ? counts[player.role] > (squad.roleMinimums[player.role] ?? 0)
-      : false;
+  const chooseTradeIn = (playerId: string) => {
+    if (busy) return;
+    setDone(null);
+    setRefusal(null);
+    setBuyIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(playerId)) next.delete(playerId);
+      else if (next.size < sellIds.size) next.add(playerId);
+      return next;
+    });
+  };
 
-    setSellId(playerId);
-    setBuyId(null);
-    setRoleFilter(player && !isFlexPlayer ? player.role : "ALL");
+  const clearDraft = () => {
+    setSellIds(new Set());
+    setBuyIds(new Set());
+    setRefusal(null);
+    setRoleFilter("ALL");
   };
 
   return (
@@ -257,16 +252,24 @@ export function Trades() {
         divergent={priceDivergence}
       />
 
+      <div className="trade-cash" aria-label="Trade budget">
+        <span>Cash to spend <strong className="num">{money(cashAvailable)}</strong><small>{money(state.capRemaining)} spare + {money(saleProceeds)} from sales</small></span>
+        <span>Trade-ins cost <strong className="num">{money(buyCost)}</strong></span>
+        <span>Cash left <strong className={`num${capAfter < 0 ? " over" : ""}`}>{money(capAfter)}</strong></span>
+      </div>
+
       <div className="trade-grid">
         <div className="trade-role-controls">
+          <span className="trade-filter-label">Filter trade-ins by role</span>
           <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
         </div>
 
         <section className="trade-side trade-out-side">
-          <h2 className="section-title">Trade out</h2>
+          <h2 className="section-title">1. Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
+          <p className="trade-step-note">{maxBatch > 0 ? `Select up to ${maxBatch} players. Their sale prices are added to the cash you can spend.` : "No trades are available for this round."}</p>
           <ul className="picker-list">
             {state.holdings.map((h) => {
-              const selected = sellId === h.playerId;
+              const selected = sellIds.has(h.playerId);
               const locked = h.midMatchLocked;
               return (
                 <li
@@ -278,7 +281,7 @@ export function Trades() {
                   <button
                     type="button"
                     className="picker-button"
-                    disabled={locked}
+                    disabled={busy || locked || (!selected && sellIds.size >= maxBatch)}
                     aria-pressed={selected}
                     onClick={() => chooseTradeOut(h.playerId)}
                   >
@@ -297,7 +300,7 @@ export function Trades() {
                   {locked ? (
                     <span className="blocked-reason">
                       <span aria-hidden="true">🔒</span> match in progress — cannot be
-                      sold (D7/G6)
+                      sold
                     </span>
                   ) : null}
                 </li>
@@ -307,28 +310,32 @@ export function Trades() {
         </section>
 
         <section className="trade-side trade-in-side">
-          <h2 className="section-title">Trade in</h2>
+          <h2 className="section-title">2. Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
+          <p className="trade-step-note">{sells.length === 0 ? "Select a player to trade out first. Then choose the same number of replacements." : "Choose the same number of replacements. Any mix of roles is fine if the final squad meets its requirements."}</p>
           <PoolPicker
-            mode="single"
             pool={state.pool.filter(
               (p) => !state.holdings.some((h) => h.playerId === p.id),
             )}
-            selectedIds={new Set(buyId ? [buyId] : [])}
-            onToggle={(id) => setBuyId(buyId === id ? null : id)}
+            selectedIds={buyIds}
+            onToggle={chooseTradeIn}
             emptyLabel="No available players."
             roleFilter={roleFilter}
             onRoleFilterChange={setRoleFilter}
             showRoleFilters={false}
             showSearch={false}
+            disabled={busy}
             availability={state.availability}
             blockFor={(p) => {
               if (state.midMatchLocked.has(p.id)) {
                 return {
                   blocked: true,
-                  reason: "🔒 match in progress — cannot be bought (D7/G6)",
+                  reason: "🔒 match in progress — cannot be bought",
                 };
               }
-              if (sell && (state.capRemaining ?? 0) + sellPrice - (p.priceEnteringRound ?? 0) < 0) {
+              if (busy || sells.length === 0 || buys.length >= sells.length || p.priceEnteringRound === null) {
+                return { blocked: true, reason: null };
+              }
+              if (cashAvailable - buyCost - p.priceEnteringRound < 0) {
                 return { blocked: true, reason: null, priceUnavailable: true };
               }
               return { blocked: false, reason: null };
@@ -338,24 +345,32 @@ export function Trades() {
       </div>
 
       <div className="card trade-summary">
-        <h2 className="section-title">This trade</h2>
-        {sell && buy ? (
-          <>
-            <p className="trade-line">
-              <strong>Out:</strong> {sell.player?.display_name} at{" "}
-              <span className="num">{money(sellPrice)}</span> ·{" "}
-              <strong>In:</strong> {buy.display_name} at{" "}
-              <span className="num">{money(buyPrice)}</span>
-            </p>
-            <p className="trade-line">
-              Cap remaining after this trade:{" "}
-              <strong className={`num${capAfter < 0 ? " over" : ""}`}>
-                {money(capAfter)}
-              </strong>
-            </p>
-            <CompositionMeter players={afterCarriers} squad={squad} />
-          </>
+        <div className="trade-summary-heading">
+          <h2 className="section-title">Review your trades</h2>
+          {sellIds.size > 0 || buyIds.size > 0 ? (
+            <button type="button" className="trade-clear" disabled={busy} onClick={clearDraft}>Clear choices</button>
+          ) : null}
+        </div>
+        {sells.length > 0 || buys.length > 0 ? (
+          <div className="trade-summary-columns">
+            <div><h3>Out</h3><ul>{sells.map((h) => <li key={h.playerId}><span>{h.player?.display_name ?? "Player"}</span><span className="num">{money(h.currentPrice)}</span></li>)}</ul></div>
+            <div><h3>In</h3><ul>{buys.map((p) => <li key={p.id}><span>{p.display_name}</span><span className="num">{money(p.priceEnteringRound)}</span></li>)}</ul></div>
+          </div>
         ) : null}
+
+        {sells.length === 0 ? (
+          <p className="trade-step-note">Choose the players to trade out first.</p>
+        ) : buys.length < sells.length ? (
+          <p className="trade-step-note">Choose {sells.length - buys.length} more {sells.length - buys.length === 1 ? "player" : "players"} to trade in.</p>
+        ) : buys.length > sells.length ? (
+          <p className="trade-step-note">Remove {buys.length - sells.length} trade-in {buys.length - sells.length === 1 ? "selection" : "selections"}, or select more players to trade out.</p>
+        ) : (
+          <CompositionMeter players={afterCarriers} squad={squad} />
+        )}
+
+        {sells.length > 0 && state.selectionsForActiveRound.some((selection) =>
+          sellIds.has(selection.player_id) && (selection.is_captain || selection.is_vice_captain),
+        ) ? <p className="trade-step-note">Your captain or vice-captain is being traded out. Check your captaincy on the Squad page after confirming.</p> : null}
 
         {blockers.length > 0 ? (
           <ul className="problem-list">
@@ -370,7 +385,7 @@ export function Trades() {
           disabled={!ready || busy}
           onClick={() => void submit()}
         >
-          {busy ? "Trading…" : "Confirm trade"}
+          {busy ? "Trading…" : `Confirm ${sells.length} ${sells.length === 1 ? "trade" : "trades"}`}
         </button>
       </div>
     </div>

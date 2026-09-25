@@ -16,7 +16,7 @@ import type { DbClient } from "../src/db/repository.js";
  * The write SHAPES below are the ones `app/lib/teamMutations.ts` actually uses,
  * which is the point — a test that proved some other shape would prove nothing:
  *   • initial build  — ONE multi-row INSERT into `trades` (all founding buys)
- *   • one trade      — ONE two-row INSERT (the sell + buy PAIR, single txn)
+ *   • trades         — ONE multi-row INSERT (one or more sell+buy pairs, single txn)
  *   • materialise    — ONE multi-row INSERT into `selections` (whole set)
  *   • captaincy      — two steps whose INTERMEDIATE state is legal (see below)
  *
@@ -287,6 +287,55 @@ describe("trades — pairs, limits and the founding exemption (G15)", () => {
     ).resolves.toBeDefined();
   });
 
+  it("a two-player batch changes the whole squad atomically and retains one captain", async () => {
+    await asOwner(() =>
+      insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
+    );
+    await expect(asOwner(() => insertTrades([
+      { kind: "sell", player: BAT1 },
+      { kind: "sell", player: BWL2 },
+      { kind: "buy", player: BATE },
+      { kind: "buy", player: BWLE },
+    ], R2))).resolves.toBeDefined();
+
+    const rows = await db.query<{ player_id: string; is_captain: boolean }>(
+      "SELECT player_id, is_captain FROM selections WHERE fantasy_team_id = $1 AND round_id = $2",
+      [FT, R2],
+    );
+    expect(rows.rows.map((row) => row.player_id).sort()).toEqual(
+      [BAT2, WK1, BWL1, AR1, BATE, BWLE].sort(),
+    );
+    expect(rows.rows.filter((row) => row.is_captain)).toHaveLength(1);
+    expect(rows.rows.find((row) => row.is_captain)?.player_id).not.toBe(BAT1);
+  });
+
+  it("a bad batch rolls back every sell and buy, leaving the squad unchanged", async () => {
+    await asOwner(() =>
+      insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
+    );
+    const before = await db.query<{ player_id: string }>(
+      "SELECT player_id FROM selections WHERE fantasy_team_id = $1 AND round_id = $2 ORDER BY player_id",
+      [FT, R2],
+    );
+    await expect(asOwner(() => insertTrades([
+      { kind: "sell", player: BAT2 },
+      { kind: "sell", player: BWL2 },
+      { kind: "buy", player: BATE },
+      { kind: "buy", player: RICH1, price: RICH },
+    ], R2))).rejects.toThrow(/role minimum/i);
+
+    const ledger = await db.query<{ n: string }>(
+      "SELECT count(*) AS n FROM trades WHERE fantasy_team_id = $1 AND round_id = $2",
+      [FT, R2],
+    );
+    expect(Number(ledger.rows[0]!.n)).toBe(0);
+    const after = await db.query<{ player_id: string }>(
+      "SELECT player_id FROM selections WHERE fantasy_team_id = $1 AND round_id = $2 ORDER BY player_id",
+      [FT, R2],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
   // EVERY TRADE BELOW IS A PAIR, because since D26 / migration 0010 the ledger
   // materialises into the selection set and a write that leaves the squad the
   // wrong size is refused by the COMPOSITION guard. Writing pairs keeps the squad
@@ -302,6 +351,24 @@ describe("trades — pairs, limits and the founding exemption (G15)", () => {
       { kind: "sell" as const, player: out },
       { kind: "buy" as const, player: into },
     ]);
+
+  it("commits all three swaps together when the season permits three trades", async () => {
+    await db.query(
+      "UPDATE seasons SET config = jsonb_set(config, '{squad,tradesPerRound}', '3') WHERE id = $1",
+      [SEASON],
+    );
+    await asOwner(() =>
+      insertTrades(LEGAL.map((p) => ({ kind: "buy" as const, player: p })), R1),
+    );
+    await expect(asOwner(() => insertTrades(pairsOf(3), R2))).resolves.toBeDefined();
+    const rows = await db.query<{ player_id: string }>(
+      "SELECT player_id FROM selections WHERE fantasy_team_id = $1 AND round_id = $2 ORDER BY player_id",
+      [FT, R2],
+    );
+    expect(rows.rows.map((row) => row.player_id)).toEqual(
+      [BAT1, BATE, WK1, BWL1, BWLE, AR2].sort(),
+    );
+  });
 
   it("trades AT the configured limit commit in a non-founding round", async () => {
     await asOwner(() =>

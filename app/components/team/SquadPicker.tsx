@@ -239,6 +239,7 @@ export function PoolPicker({
   onRoleFilterChange,
   showRoleFilters = true,
   showSearch = true,
+  disabled = false,
   availability = new Map<string, PlayerAvailabilityStatus>(),
 }: {
   pool: PoolPlayer[];
@@ -251,6 +252,7 @@ export function PoolPicker({
   onRoleFilterChange?: (role: RoleFilter) => void;
   showRoleFilters?: boolean;
   showSearch?: boolean;
+  disabled?: boolean;
   availability?: Map<string, PlayerAvailabilityStatus>;
 }) {
   const [internalRole, setInternalRole] = useState<RoleFilter>("ALL");
@@ -292,18 +294,18 @@ export function PoolPicker({
           {shown.map((p) => {
             const selected = selectedIds.has(p.id);
             const block = blockFor(p);
-            const disabled = block.blocked && !selected;
+            const isBlocked = block.blocked && !selected;
             return (
               <li
                 key={p.id}
                 className={`picker-item${selected ? " picker-item-selected" : ""}${
-                  disabled ? " picker-item-blocked" : ""
+                  isBlocked ? " picker-item-blocked" : ""
                 }`}
               >
                 <button
                   type="button"
                   className="picker-button"
-                  disabled={disabled}
+                  disabled={disabled || isBlocked}
                   aria-pressed={selected}
                   onClick={() => onToggle(p.id)}
                 >
@@ -323,7 +325,7 @@ export function PoolPicker({
                     {selected ? "✓" : mode === "single" ? "" : "+"}
                   </span>
                 </button>
-                {disabled && block.reason ? (
+                {isBlocked && block.reason ? (
                   <BlockedReason>{block.reason}</BlockedReason>
                 ) : null}
               </li>

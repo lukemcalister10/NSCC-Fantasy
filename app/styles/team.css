@@ -366,6 +366,12 @@
 .trade-out-side { grid-area: out; }
 .trade-in-side { grid-area: in; }
 .trade-role-controls { grid-area: filters; }
+.trade-filter-label { display: block; margin-bottom: var(--sp-1); color: var(--ink-muted); font-size: var(--fs-xs); }
+.trade-step-count { color: var(--ink-muted); font-size: var(--fs-sm); font-weight: 500; }
+.trade-step-note { margin: 0 0 var(--sp-3); color: var(--ink-muted); font-size: var(--fs-sm); line-height: 1.4; }
+@media (min-width: 800px) {
+  .trade-side > .trade-step-note { min-height: 2.8em; }
+}
 .trade-side .picker-list {
   height: calc(9 * 3rem + 2px);
   max-height: calc(9 * 3rem + 2px);
@@ -373,6 +379,21 @@
 .trade-side .picker-button { min-height: 3rem; }
 .trade-summary { padding: var(--sp-4); }
 .trade-line { font-size: var(--fs-sm); margin: 0 0 var(--sp-2); }
+.trade-summary-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+.trade-clear { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: var(--fs-sm); text-decoration: underline; cursor: pointer; }
+.trade-clear:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.trade-cash { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.trade-cash > span { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-subtle); color: var(--ink-muted); font-size: var(--fs-xs); }
+.trade-cash strong { color: var(--ink); font-size: var(--fs-base); }
+.trade-cash small { color: var(--ink-muted); font-size: 10px; }
+.trade-cash .over { color: var(--down); }
+.trade-summary-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-3); }
+.trade-summary-columns h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); }
+.trade-summary-columns ul { list-style: none; margin: 0; padding: 0; }
+.trade-summary-columns li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-1) var(--sp-3); padding: var(--sp-1) 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+@media (max-width: 520px) {
+  .trade-summary-columns { grid-template-columns: 1fr; gap: var(--sp-2); }
+}
 
 .register-card { padding: var(--sp-4); }
 .register-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }

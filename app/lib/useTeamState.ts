@@ -88,7 +88,7 @@ export interface TeamState {
 
   /** Price entering the active round; the figure every trade must be struck at. */
   priceOf: (playerId: string) => number;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useTeamState(seasonId: string | undefined, seasonLocked: boolean): TeamState {
@@ -216,12 +216,14 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     teamValue,
     budget,
     priceOf,
-    refetch: () => {
-      void qc.invalidateQueries({ queryKey: ["team-trades"] });
-      void qc.invalidateQueries({ queryKey: ["team-selections"] });
-      void qc.invalidateQueries({ queryKey: ["my-team"] });
-      void qc.invalidateQueries({ queryKey: ["team-pool"] });
-      void qc.invalidateQueries({ queryKey: ["player-availability"] });
+    refetch: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["team-trades"] }),
+        qc.invalidateQueries({ queryKey: ["team-selections"] }),
+        qc.invalidateQueries({ queryKey: ["my-team"] }),
+        qc.invalidateQueries({ queryKey: ["team-pool"] }),
+        qc.invalidateQueries({ queryKey: ["player-availability"] }),
+      ]);
     },
   };
 }

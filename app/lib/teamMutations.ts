@@ -8,18 +8,12 @@ import type { Holding } from "./squad";
  * WHEN and WHETHER. Nothing here bypasses anything: there is no service role in
  * the app, and G15 has no bypass GUC at all.
  *
- * ── ATOMICITY, STATED PLAINLY (operator decision 1, accepted gap) ────────────
- * PostgREST gives ONE transaction per request, and this slice may add no
- * migration — so an RPC that wraps "ledger write + selection write" in a single
- * transaction does not exist. Consequences, handled rather than hidden:
- *
- *   • The LEDGER IS AUTHORITATIVE. Holdings determine cap remaining, trade
- *     counts and the round's selection set. Reconciliation always rewrites
- *     selections to match the ledger, NEVER the reverse.
- *   • Writes are LEDGER-FIRST. The cap is the binding constraint, so a refusal
- *     lands before any selection row is touched.
- *   • A crash between the two halves is DETECTABLE (holdings ≠ selection set)
- *     and is surfaced on /team as a reconciliation banner with one-click repair.
+ * ── ATOMICITY ────────────────────────────────────────────────────────────────
+ * PostgREST gives one transaction per request. Since migration 0010, the
+ * statement-level trades trigger materialises selections from the finished
+ * ledger inside that same transaction. This is why a batch must use one INSERT:
+ * cap, trade count, final squad and captaincy are judged together, and a refusal
+ * rolls all rows back. The ledger remains authoritative if legacy data diverges.
  *
  * ── WHY SELECTIONS ARE NEVER PARTIALLY EDITED ───────────────────────────────
  * G15(a) judges the COMPLETE (team, round) set at COMMIT, so a bare DELETE of
@@ -274,35 +268,40 @@ export async function buildInitialSquad(args: {
 }
 
 /**
- * ONE TRADE = ONE SELL + ONE BUY PAIR, written as a single two-row insert so the
- * pair is one transaction: the sale funds the purchase regardless of row order,
- * exactly as the deferred cap guard expects (0003:155-160). A half-trade is
- * therefore not reachable through this path.
- *
- * Both prices are prices-entering-the-round (Rider 2).
+ * Submit every sell and buy in ONE PostgREST request/transaction. The database's
+ * statement trigger sees the complete ledger change before it materialises the
+ * squad; deferred cap, composition and trade-limit guards judge the final state.
+ * Prices must be the prices entering the round, never a live intra-round price.
  */
-export async function executeTradePair(args: {
+export async function executeTradeBatch(args: {
   teamId: string;
   roundId: string;
-  sell: BuyIntent;
-  buy: BuyIntent;
+  sells: BuyIntent[];
+  buys: BuyIntent[];
 }): Promise<void> {
-  const { error } = await supabase.from("trades").insert([
-    {
+  const ids = [...args.sells, ...args.buys].map((player) => player.playerId);
+  if (args.sells.length === 0 || args.sells.length !== args.buys.length ||
+      new Set(ids).size !== ids.length ||
+      [...args.sells, ...args.buys].some((player) => !Number.isSafeInteger(player.price) || player.price < 0)) {
+    throw new Error("Choose the same non-zero number of distinct players out and in, each with a valid price.");
+  }
+  const rows = [
+    ...args.sells.map((player) => ({
       fantasy_team_id: args.teamId,
       kind: "sell" as const,
-      player_id: args.sell.playerId,
-      price: args.sell.price,
+      player_id: player.playerId,
+      price: player.price,
       round_id: args.roundId,
-    },
-    {
+    })),
+    ...args.buys.map((player) => ({
       fantasy_team_id: args.teamId,
       kind: "buy" as const,
-      player_id: args.buy.playerId,
-      price: args.buy.price,
+      player_id: player.playerId,
+      price: player.price,
       round_id: args.roundId,
-    },
-  ]);
+    })),
+  ];
+  const { error } = await supabase.from("trades").insert(rows);
   throwOn(error);
 }
 
