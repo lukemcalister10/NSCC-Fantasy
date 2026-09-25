@@ -13,7 +13,6 @@ import {
 } from "../lib/squad";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import {
-  CapStrip,
   CompositionMeter,
   LockNotice,
   PriceBasisNote,
@@ -236,17 +235,6 @@ export function Trades() {
         </div>
       ) : null}
 
-      {state.capRemaining !== null &&
-      state.investedValue !== null &&
-      state.teamValue !== null ? (
-        <CapStrip
-          cap={squad.cap}
-          capRemaining={state.capRemaining}
-          investedValue={state.investedValue}
-          teamValue={state.teamValue}
-        />
-      ) : null}
-
       <PriceBasisNote
         roundName={state.activeRound?.name ?? "this round"}
         divergent={priceDivergence}
@@ -259,14 +247,9 @@ export function Trades() {
       </div>
 
       <div className="trade-grid">
-        <div className="trade-role-controls">
-          <span className="trade-filter-label">Filter trade-ins by role</span>
-          <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
-        </div>
-
         <section className="trade-side trade-out-side">
           <h2 className="section-title">1. Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
-          <p className="trade-step-note">{maxBatch > 0 ? `Select up to ${maxBatch} players. Their sale prices are added to the cash you can spend.` : "No trades are available for this round."}</p>
+          <p className="trade-step-note">{maxBatch > 0 ? `Select up to ${maxBatch} ${maxBatch === 1 ? "player" : "players"}. Their sale prices are added to the cash you can spend.` : "No trades are available for this round."}</p>
           <ul className="picker-list">
             {state.holdings.map((h) => {
               const selected = sellIds.has(h.playerId);
@@ -310,7 +293,13 @@ export function Trades() {
         </section>
 
         <section className="trade-side trade-in-side">
-          <h2 className="section-title">2. Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
+          <div className="trade-in-heading">
+            <h2 className="section-title">2. Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
+            <div className="trade-role-controls">
+              <span className="trade-filter-label">Filter trade-ins by role</span>
+              <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
+            </div>
+          </div>
           <p className="trade-step-note">{sells.length === 0 ? "Select a player to trade out first. Then choose the same number of replacements." : "Choose the same number of replacements. Any mix of roles is fine if the final squad meets its requirements."}</p>
           <PoolPicker
             pool={state.pool.filter(
