@@ -46,7 +46,7 @@ export function translateRefusal(err: unknown): Refusal {
     err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
   const m = serverMessage;
 
-  if (/is locked \(lock_at/.test(m) || /\(G4\)/.test(m)) {
+  if (/is locked \(lock_at/.test(m) || /\(G4\)/.test(m) || /has locked; its trades cannot be undone/i.test(m)) {
     return {
       reason:
         "That round has locked. Team changes and trades are refused once the round's lock time passes.",
@@ -66,6 +66,13 @@ export function translateRefusal(err: unknown): Refusal {
     return {
       reason: "Trading reopens when the previous round's results and prices are processed.",
       authority: "Pending-results trade lock",
+      serverMessage,
+    };
+  }
+  if (/Undo the most recent trade batch first|Trade no longer exists; refresh the page/i.test(m)) {
+    return {
+      reason: "Your trades changed while this page was open. Refresh and undo the newest batch first.",
+      authority: "Pre-lock trade undo",
       serverMessage,
     };
   }
