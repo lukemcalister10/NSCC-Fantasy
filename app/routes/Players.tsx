@@ -123,7 +123,6 @@ export function Players() {
                 <td className="players-photo-col"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} aria-label={`View ${p.display_name}`}><PlayerAvatar name={p.display_name} size={54} photoUrl={p.photo_url} /></Link></td>
                 <td className="team-name">
                   <span className="squad-player-name-row"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} className="players-name-link">{p.display_name}</Link><PlayerAvailabilityDot status={availability.data?.get(p.id)} /></span>
-                  <span className="player-start">from {money(p.starting_price)}</span>
                 </td>
                 <td><RoleBadge role={p.role} wkEligible={p.wk_eligible} /></td>
                 <td className="col-num num">{averages.data?.has(p.id) ? averages.data.get(p.id)!.toFixed(1) : "—"}</td>

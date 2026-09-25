@@ -451,7 +451,6 @@
 .players-table .players-photo-col { width: 4.5rem; padding-right: 0; }
 .players-table tbody .players-photo-col { padding-top: 3px; padding-bottom: 3px; }
 .players-table td.team-name { min-width: 11rem; }
-.players-table .player-start { display: block; font-weight: 400; }
 .players-table .players-name-link { color: var(--ink); font-weight: 700; }
 .players-table .players-name-link:hover { color: var(--accent); }
 .players-table .players-sort {
@@ -505,11 +504,6 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-}
-.player-start {
-  color: var(--ink-faint);
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
 }
 .player-price {
   display: flex;
