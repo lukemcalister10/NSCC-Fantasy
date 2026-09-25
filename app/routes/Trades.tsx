@@ -3,6 +3,7 @@ import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
 import {
   executeTradeBatch,
+  undoLatestTrades,
   translateRefusal,
   type Refusal,
 } from "../lib/teamMutations";
@@ -29,6 +30,7 @@ import { RoleBadge } from "../components/RoleBadge";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 import { money } from "../lib/format";
 import { tradeBatchTotals } from "../lib/tradeBatch";
+import { completedTradeBatches } from "../lib/tradeUndo";
 import type { PoolPlayer } from "../lib/teamQueries";
 import "../styles/team.css";
 
@@ -53,6 +55,7 @@ export function Trades() {
   const [sellIds, setSellIds] = useState<Set<string>>(() => new Set());
   const [buyIds, setBuyIds] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
@@ -117,6 +120,28 @@ export function Trades() {
       round.matches.some((match) =>
         match.status !== "finalised" && match.status !== "abandoned"),
   );
+  const completedBatches = state.activeRound
+    ? completedTradeBatches(state.trades, state.activeRound.id)
+    : [];
+
+  const undoBatch = async (buyTradeId: string, count: number) => {
+    if (!state.team || !state.activeRound || busy || undoing || resultsPending) return;
+    if (!window.confirm(`Undo your last ${count} ${count === 1 ? "trade" : "trades"}? The previous players, cash and trade slots will be restored. Check your captain and vice-captain afterwards.`)) return;
+    setUndoing(true);
+    setRefusal(null);
+    setDone(null);
+    try {
+      const undone = await undoLatestTrades(state.team.id, buyTradeId);
+      setSellIds(new Set());
+      setBuyIds(new Set());
+      setDone(`${undone} ${undone === 1 ? "trade" : "trades"} undone. Check your captain and vice-captain on the Squad tab.`);
+    } catch (err) {
+      setRefusal(translateRefusal(err));
+    } finally {
+      await state.refetch().catch(() => {});
+      setUndoing(false);
+    }
+  };
 
   const blockers: string[] = [];
   if (state.activeRound === null) blockers.push("Every round has locked.");
@@ -235,6 +260,29 @@ export function Trades() {
         </div>
       ) : null}
 
+      {completedBatches.length > 0 ? (
+        <section className="card trade-history" aria-label="Trades already made this round">
+          <h2 className="section-title">Trades already made this round</h2>
+          <p className="trade-step-note">You can undo your latest submission before lockout. If you made several, undo them newest first. Undo returns those trade slots and cash.</p>
+          <ol className="trade-history-list">
+            {completedBatches.map((batch) => (
+              <li key={batch.buyTradeId} className="trade-history-item">
+                <div className="trade-history-details">
+                  <span className="trade-history-time">{new Date(batch.createdAt).toLocaleString()}</span>
+                  <span><strong>Out:</strong> {batch.sells.map((row) => state.poolById.get(row.player_id)?.display_name ?? "Player").join(", ")}</span>
+                  <span><strong>In:</strong> {batch.buys.map((row) => state.poolById.get(row.player_id)?.display_name ?? "Player").join(", ")}</span>
+                </div>
+                {batch.isLatest ? (
+                  <button type="button" className="trade-undo" disabled={busy || undoing || resultsPending} onClick={() => void undoBatch(batch.buyTradeId, batch.buys.length)}>
+                    {undoing ? "Undoing…" : `Undo ${batch.buys.length === 1 ? "trade" : "batch"}`}
+                  </button>
+                ) : <span className="trade-history-older">Undo newer trades first</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       <PriceBasisNote
         roundName={state.activeRound?.name ?? "this round"}
         divergent={priceDivergence}
@@ -264,7 +312,7 @@ export function Trades() {
                   <button
                     type="button"
                     className="picker-button"
-                    disabled={busy || locked || (!selected && sellIds.size >= maxBatch)}
+                    disabled={busy || undoing || locked || (!selected && sellIds.size >= maxBatch)}
                     aria-pressed={selected}
                     onClick={() => chooseTradeOut(h.playerId)}
                   >
@@ -312,7 +360,7 @@ export function Trades() {
             onRoleFilterChange={setRoleFilter}
             showRoleFilters={false}
             showSearch={false}
-            disabled={busy}
+            disabled={busy || undoing}
             availability={state.availability}
             blockFor={(p) => {
               if (state.midMatchLocked.has(p.id)) {
@@ -337,7 +385,7 @@ export function Trades() {
         <div className="trade-summary-heading">
           <h2 className="section-title">Review your trades</h2>
           {sellIds.size > 0 || buyIds.size > 0 ? (
-            <button type="button" className="trade-clear" disabled={busy} onClick={clearDraft}>Clear choices</button>
+            <button type="button" className="trade-clear" disabled={busy || undoing} onClick={clearDraft}>Clear choices</button>
           ) : null}
         </div>
         {sells.length > 0 || buys.length > 0 ? (
@@ -371,7 +419,7 @@ export function Trades() {
 
         <button
           className="btn-primary"
-          disabled={!ready || busy}
+          disabled={!ready || busy || undoing}
           onClick={() => void submit()}
         >
           {busy ? "Trading…" : `Confirm ${sells.length} ${sells.length === 1 ? "trade" : "trades"}`}

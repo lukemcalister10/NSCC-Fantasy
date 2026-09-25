@@ -305,6 +305,19 @@ export async function executeTradeBatch(args: {
   throwOn(error);
 }
 
+/** Atomically remove only the team's latest, still-open trade submission. */
+export async function undoLatestTrades(teamId: string, buyTradeId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("undo_latest_trades", {
+    p_team: teamId,
+    p_buy_trade: buyTradeId,
+  });
+  throwOn(error);
+  if (typeof data !== "number" || data < 1) {
+    throw new Error("The undo did not return a valid trade count. Refresh before trying again.");
+  }
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Selection materialisation (holdings → the round's selection set)
 // ---------------------------------------------------------------------------
