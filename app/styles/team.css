@@ -386,6 +386,11 @@
 .trade-cash strong { color: var(--ink); font-size: var(--fs-base); }
 .trade-cash small { color: var(--ink-muted); font-size: 10px; }
 .trade-cash .over { color: var(--down); }
+@media (max-width: 420px) {
+  .trade-cash { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-1); }
+  .trade-cash > span { padding: var(--sp-2) var(--sp-1); }
+  .trade-cash strong { font-size: var(--fs-sm); }
+}
 .trade-summary-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-3); }
 .trade-summary-columns h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); }
 .trade-summary-columns ul { list-style: none; margin: 0; padding: 0; }
