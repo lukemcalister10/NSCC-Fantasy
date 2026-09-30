@@ -5,6 +5,7 @@ import type { RoundBasic } from "../app/lib/teamQueries";
 
 const rounds: RoundBasic[] = [1, 2, 3].map((seq) => ({
   id: `r${seq}`, seq, name: `Round ${seq}`, lock_at: "2026-09-01T00:00:00Z",
+  scorecards_frozen_at: seq === 3 ? null : "2026-09-30T00:00:00Z",
   matches: [{ id: `m${seq}`, status: seq === 3 ? "scheduled" : "finalised" }],
 }));
 
@@ -46,5 +47,14 @@ describe("player price history by round", () => {
       scores: [score(1, 30)],
     }, rounds);
     expect(rows[1]).toMatchObject({ score: 30, price: null, move: null });
+  });
+
+  it("does not call an unfinished round DNP before scorecards are frozen", () => {
+    const pendingRounds = rounds.map((round) => round.seq === 2
+      ? { ...round, scorecards_frozen_at: null } : round);
+    const rows = playerRoundHistory({ starting_price: 20_000,
+      priceHistory: [{ seq: 0, match_id: null, price: 20_000 }], scores: [],
+    }, pendingRounds);
+    expect(rows.map((row) => row.label)).toEqual(["Starting price", "After Round 1"]);
   });
 });

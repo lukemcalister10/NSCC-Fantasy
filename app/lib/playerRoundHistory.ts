@@ -24,7 +24,7 @@ export function playerRoundHistory(
     .map((point) => [point.match_id, point]));
 
   for (const round of [...rounds].sort((a, b) => a.seq - b.seq)) {
-    if (!round.matches.length || !round.matches.every((match) =>
+    if (!round.scorecards_frozen_at || !round.matches.length || !round.matches.every((match) =>
       match.status === "finalised" || match.status === "abandoned")) continue;
     const scores = player.scores.filter((score) => score.matches?.rounds?.seq === round.seq && score.played);
     if (!scores.length) {

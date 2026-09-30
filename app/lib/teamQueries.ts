@@ -99,6 +99,7 @@ export interface RoundBasic {
   seq: number;
   name: string;
   lock_at: string;
+  scorecards_frozen_at?: string | null;
   matches: RoundMatch[];
 }
 
@@ -111,7 +112,7 @@ export function useSeasonRounds(seasonId: string | undefined) {
       const rows = unwrap<RoundBasic[]>(
         await supabase
           .from("rounds")
-          .select("id,seq,name,lock_at,matches(id,status)")
+          .select("id,seq,name,lock_at,scorecards_frozen_at,matches(id,status)")
           .eq("season_id", seasonId!)
           .order("seq", { ascending: true }),
       );
