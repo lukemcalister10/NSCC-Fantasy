@@ -15,6 +15,7 @@ import { previousSeasonFor, type PreviousSeasonLine } from "../lib/previousSeaso
 import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
 import { usePlayerAvailability } from "../lib/playerAvailability";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
+import { playerRoundHistory } from "../lib/playerRoundHistory";
 
 /** Minimal, dependency-free sparkline of the price path (seq order). */
 function PriceSparkline({ prices }: { prices: number[] }) {
@@ -121,6 +122,7 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
   // The breakdown must reconcile: bat + bowl + field + bonus + this = pts (D28).
   const showSecondInnings = p.scores.some((s) => s.second_innings_adjustment !== 0);
   const previousSeason = previousSeasonFor(p.registry_key);
+  const roundHistory = playerRoundHistory(p, rounds.data ?? []);
 
   return (
     <div className={`page player-profile-page${modal ? " player-profile-page-modal" : ""}`}>
@@ -159,32 +161,31 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
 
       <h2 className="section-title">Price history</h2>
       <div className="card price-history-card">
-        <PriceSparkline prices={p.priceHistory.map((h) => h.price)} />
+        <PriceSparkline prices={roundHistory.map((row) => row.price).filter((price): price is number => price !== null)} />
         <table className="table">
           <thead>
             <tr>
               <th>Point</th>
+              <th className="col-num">Score</th>
               <th className="col-num">Price</th>
               <th className="col-num">Move</th>
             </tr>
           </thead>
           <tbody>
-            {p.priceHistory.map((h, i) => {
-              const prev = i > 0 ? p.priceHistory[i - 1]!.price : h.price;
-              return (
-                <tr key={h.seq}>
-                  <td>{h.match_id === null ? "Starting price" : `After match ${i}`}</td>
-                  <td className="col-num num">{money(h.price)}</td>
+            {roundHistory.map((row) => (
+                <tr key={row.key}>
+                  <td>{row.label}</td>
+                  <td className="col-num num">{row.score ?? "—"}</td>
+                  <td className="col-num num">{money(row.price)}</td>
                   <td className="col-num">
-                    {i === 0 ? (
+                    {row.move === null ? (
                       <span className="movement movement-flat">–</span>
                     ) : (
-                      <PriceMovement delta={h.price - prev} />
+                      <PriceMovement delta={row.move} />
                     )}
                   </td>
                 </tr>
-              );
-            })}
+            ))}
           </tbody>
         </table>
       </div>
