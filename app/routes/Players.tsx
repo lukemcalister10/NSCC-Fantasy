@@ -1,24 +1,34 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSeason, usePlayers, usePlayerAverages, useOwnershipCounts, type PlayerListItem } from "../lib/queries";
+import { useSeason, usePlayers, usePlayerAverages, useLastRoundScores, useOwnershipCounts, type PlayerListItem } from "../lib/queries";
 import { RoleBadge } from "../components/RoleBadge";
 import { PriceMovement } from "../components/PriceMovement";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { Loading, ErrorState, EmptyState } from "../components/states";
 import { money } from "../lib/format";
 import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
+import { lastCompletedRoundOf } from "../lib/roundStatus";
 import { usePlayerAvailability } from "../lib/playerAvailability";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 
-type Sort = "price" | "name" | "role" | "average" | "owned" | "change";
+type Sort = "price" | "name" | "role" | "average" | "lastRound" | "owned" | "change";
 
 const roleOrder: Record<string, number> = { BAT: 0, AR: 1, WK: 2, BWL: 3 };
 
 function sortPlayers(
   rows: PlayerListItem[], sort: Sort,
-  averages: Map<string, number>, owned: Map<string, number>, changes: Map<string, number>, descending: boolean,
+  averages: Map<string, number>, lastRoundScores: Map<string, number>, owned: Map<string, number>, changes: Map<string, number>, descending: boolean,
 ): PlayerListItem[] {
   const out = [...rows];
+  if (sort === "lastRound") {
+    return out.sort((a, b) => {
+      const aScore = lastRoundScores.get(a.id);
+      const bScore = lastRoundScores.get(b.id);
+      if (aScore === undefined) return bScore === undefined ? a.display_name.localeCompare(b.display_name) : 1;
+      if (bScore === undefined) return -1;
+      return (descending ? bScore - aScore : aScore - bScore) || a.display_name.localeCompare(b.display_name);
+    });
+  }
   if (sort === "name") out.sort((a, b) => a.display_name.localeCompare(b.display_name));
   else if (sort === "role")
     out.sort(
@@ -37,6 +47,7 @@ const headings: { key: Sort; label: string; title?: string }[] = [
   { key: "name", label: "Player" },
   { key: "role", label: "Role" },
   { key: "average", label: "Average", title: "Fantasy points per match played" },
+  { key: "lastRound", label: "Last round", title: "Fantasy points in the latest completed round; dash means did not play" },
   { key: "owned", label: "Ownership", title: "Teams selecting this player in the current round" },
   { key: "change", label: "Ownership change", title: "Change in teams since the previous round" },
   { key: "price", label: "Price" },
@@ -53,9 +64,11 @@ export function Players() {
   const players = usePlayers(season.data?.id);
   const rounds = useSeasonRounds(season.data?.id);
   const activeRound = activeRoundOf(rounds.data);
+  const lastCompletedRound = lastCompletedRoundOf(rounds.data);
   const ownershipRound = activeRound ?? rounds.data?.[rounds.data.length - 1];
   const availability = usePlayerAvailability(activeRound?.id);
   const averages = usePlayerAverages(season.data?.id);
+  const lastRoundScores = useLastRoundScores(lastCompletedRound?.id);
   const previousRound = rounds.data?.find((round) => round.seq === (ownershipRound?.seq ?? 0) - 1);
   const ownership = useOwnershipCounts([ownershipRound?.id, previousRound?.id].filter((id): id is string => !!id));
   const [sort, setSort] = useState<Sort>("price");
@@ -80,8 +93,8 @@ export function Players() {
   }, [ownership.data, previousRound?.id, owned]);
 
   const rows = useMemo(
-    () => (players.data ? sortPlayers(players.data, sort, averages.data ?? new Map(), owned, changes, descending) : []),
-    [players.data, sort, descending, averages.data, owned, changes],
+    () => (players.data ? sortPlayers(players.data, sort, averages.data ?? new Map(), lastRoundScores.data ?? new Map(), owned, changes, descending) : []),
+    [players.data, sort, descending, averages.data, lastRoundScores.data, owned, changes],
   );
 
   return (
@@ -95,12 +108,16 @@ export function Players() {
         ) : null}
       </div>
 
-      {season.isLoading || players.isLoading || averages.isLoading || ownership.isLoading ? (
+      {season.isLoading || players.isLoading || rounds.isLoading || averages.isLoading || lastRoundScores.isLoading || ownership.isLoading ? (
         <Loading />
       ) : players.error ? (
         <ErrorState error={players.error} />
       ) : averages.error ? (
         <ErrorState error={averages.error} />
+      ) : rounds.error ? (
+        <ErrorState error={rounds.error} />
+      ) : lastRoundScores.error ? (
+        <ErrorState error={lastRoundScores.error} />
       ) : ownership.error ? (
         <ErrorState error={ownership.error} />
       ) : rows.length === 0 ? (
@@ -126,6 +143,7 @@ export function Players() {
                 </td>
                 <td><RoleBadge role={p.role} wkEligible={p.wk_eligible} /></td>
                 <td className="col-num num">{averages.data?.has(p.id) ? averages.data.get(p.id)!.toFixed(1) : "—"}</td>
+                <td className="col-num num">{lastRoundScores.data?.get(p.id) ?? "—"}</td>
                 <td className="col-num num">{ownershipRound ? owned.get(p.id) ?? 0 : "—"}</td>
                 <td className="col-num num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</td>
                 <td className="col-num"><span className="price-now num">{money(p.currentPrice)}</span><PriceMovement delta={p.movement} /></td>

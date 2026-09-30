@@ -364,6 +364,27 @@ export function usePlayerAverages(seasonId: string | undefined) {
   });
 }
 
+/** One published round's actual scores. No row means DNP; a row with base 0 means played. */
+export function useLastRoundScores(roundId: string | undefined) {
+  return useQuery({
+    queryKey: ["last-round-scores", roundId],
+    enabled: !!roundId,
+    staleTime: STALE,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const rows = unwrap<{ player_id: string; base: number }[]>(
+        await supabase.from("player_match_scores")
+          .select("player_id,base,matches!inner(round_id)")
+          .eq("matches.round_id", roundId!)
+          .eq("played", true),
+      );
+      // Sum if someone played multiple club matches in the same fantasy round.
+      const scores = new Map<string, number>();
+      for (const row of rows) scores.set(row.player_id, (scores.get(row.player_id) ?? 0) + row.base);
+      return scores;
+    },
+  });
+}
+
 /** Aggregate ownership only; no other team's individual squad is exposed. */
 export function useOwnershipCounts(roundIds: string[], playerId?: string) {
   return useQuery({
