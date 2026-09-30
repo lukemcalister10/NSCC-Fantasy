@@ -123,7 +123,35 @@ export function Players() {
       ) : rows.length === 0 ? (
         <EmptyState>No players in the pool yet.</EmptyState>
       ) : (
-        <div className="card table-card">
+        <>
+        <div className="mobile-sort-control">
+          <label htmlFor="players-mobile-sort">Sort players</label>
+          <select id="players-mobile-sort" value={sort} onChange={(event) => changeSort(event.target.value as Sort)}>
+            {headings.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <button type="button" className="btn-ghost" onClick={() => setDescending((value) => !value)} aria-label={`Sort ${descending ? "ascending" : "descending"}`}>
+            {descending ? "↓" : "↑"}
+          </button>
+        </div>
+        <div className="players-mobile-list">
+          {rows.map((p) => (
+            <div className="card players-mobile-card" key={p.id}>
+              <Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} aria-label={`View ${p.display_name}`}><PlayerAvatar name={p.display_name} size={54} photoUrl={p.photo_url} /></Link>
+              <div className="players-mobile-main">
+                <span className="squad-player-name-row"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} className="players-name-link">{p.display_name}</Link><PlayerAvailabilityDot status={availability.data?.get(p.id)} /></span>
+                <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
+              </div>
+              <div className="players-mobile-price"><strong className="num">{money(p.currentPrice)}</strong><PriceMovement delta={p.movement} /></div>
+              <div className="players-mobile-stats">
+                <span>Avg <strong className="num">{averages.data?.has(p.id) ? averages.data.get(p.id)!.toFixed(1) : "—"}</strong></span>
+                <span>Last {lastCompletedRound ? `R${lastCompletedRound.seq}` : "round"} <strong className="num">{lastRoundScores.data?.get(p.id) ?? "—"}</strong></span>
+                <span>Ownership <strong className="num">{ownershipRound ? owned.get(p.id) ?? 0 : "—"}</strong></span>
+                <span>Change <strong className="num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</strong></span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="card table-card players-desktop-table">
           <table className="table players-table">
             <thead><tr>
               <th className="players-photo-col" aria-label="Photo" />
@@ -151,6 +179,7 @@ export function Players() {
             ))}</tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

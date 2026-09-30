@@ -467,6 +467,68 @@
 .players-table .players-sort:hover,
 .players-table .players-sort:focus-visible { color: var(--accent); }
 .players-table td:last-child .movement { display: block; }
+.mobile-sort-control, .players-mobile-list, .ladder-mobile-list { display: none; }
+@media (max-width: 700px) {
+  .players-desktop-table, .ladder-desktop-table { display: none; }
+  .mobile-sort-control {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+    font-size: var(--fs-sm);
+  }
+  .mobile-sort-control label { white-space: nowrap; }
+  .mobile-sort-control select { min-width: 0; flex: 1; }
+  .mobile-sort-control .btn-ghost { min-width: 2.5rem; }
+  .players-mobile-list, .ladder-mobile-list { display: grid; gap: var(--sp-2); }
+  .players-mobile-card {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-2);
+    row-gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .players-mobile-main { min-width: 0; }
+  .players-mobile-main .players-name-link { color: var(--ink); font-weight: 700; }
+  .players-mobile-main .squad-player-name-row { flex-wrap: wrap; }
+  .players-mobile-price { text-align: right; white-space: nowrap; }
+  .players-mobile-price .movement { display: block; }
+  .players-mobile-stats {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-1);
+    padding-top: var(--sp-1);
+    border-top: 1px solid var(--border);
+    color: var(--ink-muted);
+    font-size: var(--fs-xs);
+  }
+  .players-mobile-stats span { display: flex; flex-direction: column; white-space: nowrap; }
+  .players-mobile-stats strong { color: var(--ink); font-size: var(--fs-sm); }
+  .ladder-mobile-card {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--sp-2);
+    row-gap: var(--sp-2);
+    padding: var(--sp-3);
+  }
+  .ladder-mobile-rank { color: var(--ink-muted); }
+  .ladder-mobile-team { min-width: 0; font-weight: 700; }
+  .ladder-mobile-team .ladder-owner { display: block; }
+  .ladder-mobile-value { white-space: nowrap; text-align: right; }
+  .ladder-mobile-stats {
+    grid-column: 2 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-1);
+    padding-top: var(--sp-1);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-sm);
+    color: var(--ink-muted);
+  }
+}
 .player-list {
   display: flex;
   flex-direction: column;

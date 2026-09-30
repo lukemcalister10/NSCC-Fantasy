@@ -62,7 +62,28 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
   if (!rows.length) return <EmptyState>No rounds have been scored yet.</EmptyState>;
 
   return (
-    <div className="card table-card">
+    <>
+    <div className="mobile-sort-control">
+      <label htmlFor="ladder-mobile-sort">Sort ladder</label>
+      <select id="ladder-mobile-sort" value={sort} onChange={(event) => changeSort(event.target.value as SortKey)}>
+        {columns.map(({ key, label, title }) => <option key={key} value={key}>{title ?? label}</option>)}
+      </select>
+      <button type="button" className="btn-ghost" onClick={() => setDescending((value) => !value)} aria-label={`Sort ${descending ? "ascending" : "descending"}`}>
+        {descending ? "↓" : "↑"}
+      </button>
+    </div>
+    <div className="ladder-mobile-list">
+      {rows.map((row, index) => (
+        <div className="card ladder-mobile-card" key={row.fantasy_team_id}>
+          <span className="ladder-mobile-rank num">{index + 1}</span>
+          <div className="ladder-mobile-team"><Link className="team-profile-link" to={`/teams/${row.fantasy_team_id}`}>{row.fantasy_teams?.name ?? "—"}</Link>{owners.data?.get(row.fantasy_team_id) ? <span className="ladder-owner">{owners.data.get(row.fantasy_team_id)}</span> : null}</div>
+          <strong className="ladder-mobile-value num">{money(row.team_value)}</strong>
+          <div className="ladder-mobile-stats num"><span>{row.wins}W · {row.losses}L · {row.ties}T</span><span>{row.ladder_points} pts</span><span>{row.points_for} PF</span></div>
+        </div>
+      ))}
+      <p className="table-foot-note">Team value includes current player value and spare cap.</p>
+    </div>
+    <div className="card table-card ladder-desktop-table">
       <table className="table ladder-table sortable-ladder">
         <thead><tr>
           <th className="col-rank">#</th>
@@ -90,5 +111,6 @@ export function SortableLadder({ seasonId }: { seasonId: string | undefined }) {
       </table>
       <p className="table-foot-note">Sorted by wins, then fantasy points scored (PF). Team value = current player value + spare cap. Click a heading to sort.</p>
     </div>
+    </>
   );
 }
