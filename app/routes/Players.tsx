@@ -130,7 +130,7 @@ export function Players() {
               {headings.map(({ key, label, title }) => (
                 <th key={key} className={key === "name" || key === "role" ? undefined : "col-num"} aria-sort={sort === key ? descending ? "descending" : "ascending" : "none"}>
                   <button type="button" className="players-sort" title={title} onClick={() => changeSort(key)}>
-                    {label}<span aria-hidden="true">{sort === key ? descending ? " ↓" : " ↑" : " ↕"}</span>
+                    {key === "lastRound" && lastCompletedRound ? `${label} (R${lastCompletedRound.seq})` : label}<span aria-hidden="true">{sort === key ? descending ? " ↓" : " ↑" : " ↕"}</span>
                   </button>
                 </th>
               ))}
