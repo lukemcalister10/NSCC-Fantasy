@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminPage, Section, StatusLine, Field } from "./adminChrome";
 import { useAdminSeason, useAdminRounds } from "../../lib/adminQueries";
 import type { AdminMatch, AdminRound } from "../../lib/adminQueries";
@@ -12,6 +12,7 @@ import {
   explainWriteError,
 } from "../../lib/adminMutations";
 import { Loading, ErrorState, EmptyState } from "../../components/states";
+import { fetchRoundFreezeAudit } from "../../lib/roundFreezeAudit";
 import {
   adelaideLabel,
   defaultRoundLockAt,
@@ -137,6 +138,13 @@ function RoundCard({ round }: { round: AdminRound }) {
   const [name, setName] = useState(round.name);
   const [lockAt, setLockAt] = useState(toAdelaideInputValue(round.lock_at));
   const [confirmFreeze, setConfirmFreeze] = useState(false);
+  const [checkedScorecards, setCheckedScorecards] = useState(false);
+  const freezeAudit = useQuery({
+    queryKey: ["admin", "freeze-audit", round.id],
+    queryFn: () => fetchRoundFreezeAudit(round.id),
+    enabled: confirmFreeze && !frozen,
+    staleTime: 0,
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -145,7 +153,13 @@ function RoundCard({ round }: { round: AdminRound }) {
   });
 
   const endLockout = useMutation({
-    mutationFn: () => freezeRoundScorecards(round.id),
+    mutationFn: async () => {
+      const freshAudit = await fetchRoundFreezeAudit(round.id);
+      if (freshAudit.blockers.length) {
+        throw new Error(`Freeze check changed: ${freshAudit.blockers.join(" ")}`);
+      }
+      await freezeRoundScorecards(round.id);
+    },
     onSuccess: async () => {
       setConfirmFreeze(false);
       await qc.invalidateQueries({ queryKey: ["admin"] });
@@ -202,28 +216,55 @@ function RoundCard({ round }: { round: AdminRound }) {
             <>
               <button
                 className="btn-ghost btn-danger"
-                disabled={endLockout.isPending}
+                disabled={endLockout.isPending || freezeAudit.isFetching ||
+                  !freezeAudit.data || freezeAudit.data.blockers.length > 0 || !checkedScorecards}
                 onClick={() => endLockout.mutate()}
               >
                 {endLockout.isPending ? "Ending…" : "Yes — end lockout permanently"}
               </button>
-              <button className="btn-ghost" onClick={() => setConfirmFreeze(false)}>
+              <button className="btn-ghost" onClick={() => {
+                setConfirmFreeze(false);
+                setCheckedScorecards(false);
+              }}>
                 Cancel
               </button>
             </>
           ) : (
-            <button className="btn-ghost btn-danger" onClick={() => setConfirmFreeze(true)}>
+            <button className="btn-ghost btn-danger" onClick={() => {
+              setCheckedScorecards(false);
+              setConfirmFreeze(true);
+            }}>
               End scorecard lockout…
             </button>
           )
         ) : null}
       </div>
       {confirmFreeze && !frozen ? (
-        <p className="admin-status admin-status-error">
-          This is one-way. After it, {round.name}'s scorecards can never be corrected in the
-          ordinary course — recompute will keep reproducing whatever they say (D24). Enter and
-          check every scorecard for this round first.
-        </p>
+        <div className="admin-banner" style={{ marginTop: "var(--sp-3)" }}>
+          <strong>This is one-way. Check every scorecard before ending lockout.</strong>
+          <p className="admin-note">This check reads the database only. It confirms that finalised matches have committed scorecards and that published scores and prices cover exactly the named players. It cannot verify that the names or figures are correct.</p>
+          {freezeAudit.isFetching ? <p>Checking this round…</p> : null}
+          {freezeAudit.error ? <p className="admin-status admin-status-error">{String(freezeAudit.error)}</p> : null}
+          {freezeAudit.data ? (
+            <>
+              {freezeAudit.data.blockers.length ? (
+                <ul className="admin-status admin-status-error">
+                  {freezeAudit.data.blockers.map((issue, index) => <li key={index}>{issue}</li>)}
+                </ul>
+              ) : <p className="admin-status admin-banner-ok">Database coverage checks passed.</p>}
+              {freezeAudit.data.matches.map((report) => (
+                <details key={report.match.id}>
+                  <summary>{report.match.grade} v {report.match.opponent} · {report.match.status} · {report.lineup.length} named, {report.scoreCount} scored, {report.priceCount} priced</summary>
+                  <p className="admin-note">Named as played: {report.lineup.length ? report.lineup.join(", ") : "none"}</p>
+                </details>
+              ))}
+              <label style={{ display: "block", marginTop: "var(--sp-3)" }}>
+                <input type="checkbox" checked={checkedScorecards} onChange={(event) => setCheckedScorecards(event.target.checked)} />{" "}
+                I checked the named players against the club scorecards, including played-zero versus DNP, and confirmed the recorded figures.
+              </label>
+            </>
+          ) : null}
+        </div>
       ) : null}
       <StatusLine error={save.error ?? endLockout.error} />
 
