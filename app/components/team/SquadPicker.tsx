@@ -11,7 +11,7 @@ import { ROLE_ORDER } from "../../lib/squad";
 import type { PoolPlayer } from "../../lib/teamQueries";
 import type { HoldingView } from "../../lib/useTeamState";
 import { BlockedReason } from "./TeamChrome";
-import { usePlayerScoringStats } from "../../lib/queries";
+import { usePlayerScoringStats, useOwnershipCounts } from "../../lib/queries";
 
 /**
  * THE SQUAD (holdings). There is no bench and no emergency mechanic (operator
@@ -22,6 +22,7 @@ import { usePlayerScoringStats } from "../../lib/queries";
  */
 export function SquadTable({
   seasonId,
+  roundId,
   holdings,
   captainId,
   viceCaptainId,
@@ -31,6 +32,7 @@ export function SquadTable({
   availability,
 }: {
   seasonId: string | undefined;
+  roundId: string | undefined;
   holdings: HoldingView[];
   captainId: string | null;
   viceCaptainId: string | null;
@@ -41,6 +43,10 @@ export function SquadTable({
 }) {
   const location = useLocation();
   const scoringStats = usePlayerScoringStats(seasonId);
+  const ownership = useOwnershipCounts(roundId ? [roundId] : []);
+  const ownershipByPlayer = useMemo(() => new Map(
+    (ownership.data ?? []).map((row) => [row.player_id, row.team_count > 0 ? Math.round(row.selected_count / row.team_count * 100) : 0]),
+  ), [ownership.data]);
   const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
   const sortedHoldings = useMemo(
     () =>
@@ -105,14 +111,10 @@ export function SquadTable({
                   {h.player ? (
                     <PlayerAvatar
                       name={h.player.display_name}
-                      size={40}
+                      size={44}
                       photoUrl={h.player.photo_url}
                     />
                   ) : null}
-                  <span className="squad-mobile-average">
-                    <span>Avg</span>
-                    <strong>{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</strong>
-                  </span>
                 </td>
                 <td className="team-name">
                   <span className="squad-player">
@@ -134,7 +136,6 @@ export function SquadTable({
                     <span className="squad-mobile-price">
                       {money(h.currentPrice)} <span className="squad-mobile-gain" title="Gain or loss since purchase">(<PriceMovement delta={gain} />)</span>
                     </span>
-                    <span className="squad-mobile-matches">Matches <strong>{scoringStats.data ? (scoringStats.data.get(h.playerId)?.matches ?? 0) : "—"}</strong></span>
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress
@@ -190,6 +191,11 @@ export function SquadTable({
                       <span className="captain-full-label">VICE</span><span className="captain-short-label">V</span>
                     </button>
                   </div>
+                </td>
+                <td className="squad-mobile-stats" colSpan={8}>
+                  <span>Avg: <strong>{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</strong>,</span>
+                  <span>Matches: <strong>{scoringStats.data ? (scoringStats.data.get(h.playerId)?.matches ?? 0) : "—"}</strong>,</span>
+                  <span>Ownership: <strong>{ownership.data && roundId ? `${ownershipByPlayer.get(h.playerId) ?? 0}%` : "—"}</strong></span>
                 </td>
               </tr>
             );

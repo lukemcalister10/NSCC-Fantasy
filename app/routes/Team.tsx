@@ -268,6 +268,7 @@ export function Team() {
             onSetCaptain={(playerId) => void changeCaptaincy({ captainId: playerId, viceCaptainId: captaincy?.viceCaptainId === playerId ? null : (captaincy?.viceCaptainId ?? null) })}
             onSetViceCaptain={(playerId) => void changeCaptaincy({ captainId: captaincy?.captainId ?? playerId, viceCaptainId: playerId })}
           /> : <SquadTable
+            roundId={state.activeRound?.id}
             seasonId={seasonId}
             holdings={state.holdings}
             captainId={captaincy?.captainId ?? null}
