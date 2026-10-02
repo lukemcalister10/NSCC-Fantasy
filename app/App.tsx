@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { lazy, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Routes,
   Route,
@@ -11,19 +11,22 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { RequireManager } from "./auth/RequireManager";
 import { AppShell } from "./components/AppShell";
 import { Login } from "./routes/Login";
-import { Ladder } from "./routes/Ladder";
-import { Players } from "./routes/Players";
-import { PlayerProfile } from "./routes/PlayerProfile";
-import { Rounds } from "./routes/Rounds";
-import { Team } from "./routes/Team";
-import { FantasyTeamProfile } from "./routes/FantasyTeamProfile";
-import { Trades } from "./routes/Trades";
-import { Help } from "./routes/Help";
-import { AdminHome } from "./routes/admin/AdminHome";
-import { AdminPlayers } from "./routes/admin/AdminPlayers";
-import { AdminRounds } from "./routes/admin/AdminRounds";
-import { AdminScorecards } from "./routes/admin/AdminScorecards";
-import { AdminSettings } from "./routes/admin/AdminSettings";
+import { DeferredPage } from "./components/DeferredPage";
+
+// Download each page when it is opened, including the profile's historical stats.
+const Ladder = lazy(() => import("./routes/Ladder").then((m) => ({ default: m.Ladder })));
+const Players = lazy(() => import("./routes/Players").then((m) => ({ default: m.Players })));
+const PlayerProfile = lazy(() => import("./routes/PlayerProfile").then((m) => ({ default: m.PlayerProfile })));
+const Rounds = lazy(() => import("./routes/Rounds").then((m) => ({ default: m.Rounds })));
+const Team = lazy(() => import("./routes/Team").then((m) => ({ default: m.Team })));
+const FantasyTeamProfile = lazy(() => import("./routes/FantasyTeamProfile").then((m) => ({ default: m.FantasyTeamProfile })));
+const Trades = lazy(() => import("./routes/Trades").then((m) => ({ default: m.Trades })));
+const Help = lazy(() => import("./routes/Help").then((m) => ({ default: m.Help })));
+const AdminHome = lazy(() => import("./routes/admin/AdminHome").then((m) => ({ default: m.AdminHome })));
+const AdminPlayers = lazy(() => import("./routes/admin/AdminPlayers").then((m) => ({ default: m.AdminPlayers })));
+const AdminRounds = lazy(() => import("./routes/admin/AdminRounds").then((m) => ({ default: m.AdminRounds })));
+const AdminScorecards = lazy(() => import("./routes/admin/AdminScorecards").then((m) => ({ default: m.AdminScorecards })));
+const AdminSettings = lazy(() => import("./routes/admin/AdminSettings").then((m) => ({ default: m.AdminSettings })));
 
 /**
  * Route map. `/login` is the only unauthenticated page; everything else sits
@@ -34,8 +37,8 @@ import { AdminSettings } from "./routes/admin/AdminSettings";
  * outer guard before the manager check runs, so D17 holds for admin URLs too.
  * The manager check is chrome only — RLS (0004) is the authority (G13).
  *
- * The /team/* and /admin/* leaves are placeholders from the shared-chrome slice
- * (Standing Rule 9b): S-C replaces the team routes, S-A the admin routes.
+ * Suspense is scoped to each page so the navigation and a profile's background
+ * remain visible while its code downloads.
  */
 export function App() {
   const location = useLocation();
@@ -53,20 +56,20 @@ export function App() {
             </RequireAuth>
           }
         >
-          <Route path="/" element={<Ladder />} />
-          <Route path="/players" element={<Players />} />
-          <Route path="/players/:id" element={<PlayerProfile />} />
-          <Route path="/rounds" element={<Rounds />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="/teams/:id" element={<FantasyTeamProfile />} />
-          <Route path="/team/trades" element={<Trades />} />
-          <Route path="/help" element={<Help />} />
+          <Route path="/" element={<DeferredPage><Ladder /></DeferredPage>} />
+          <Route path="/players" element={<DeferredPage><Players /></DeferredPage>} />
+          <Route path="/players/:id" element={<DeferredPage><PlayerProfile /></DeferredPage>} />
+          <Route path="/rounds" element={<DeferredPage><Rounds /></DeferredPage>} />
+          <Route path="/team" element={<DeferredPage><Team /></DeferredPage>} />
+          <Route path="/teams/:id" element={<DeferredPage><FantasyTeamProfile /></DeferredPage>} />
+          <Route path="/team/trades" element={<DeferredPage><Trades /></DeferredPage>} />
+          <Route path="/help" element={<DeferredPage><Help /></DeferredPage>} />
           <Route element={<RequireManager />}>
-            <Route path="/admin" element={<AdminHome />} />
-            <Route path="/admin/players" element={<AdminPlayers />} />
-            <Route path="/admin/rounds" element={<AdminRounds />} />
-            <Route path="/admin/scorecards" element={<AdminScorecards />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin" element={<DeferredPage><AdminHome /></DeferredPage>} />
+            <Route path="/admin/players" element={<DeferredPage><AdminPlayers /></DeferredPage>} />
+            <Route path="/admin/rounds" element={<DeferredPage><AdminRounds /></DeferredPage>} />
+            <Route path="/admin/scorecards" element={<DeferredPage><AdminScorecards /></DeferredPage>} />
+            <Route path="/admin/settings" element={<DeferredPage><AdminSettings /></DeferredPage>} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -161,7 +164,7 @@ function PlayerProfileModal() {
         >
           ×
         </button>
-        <PlayerProfile modal />
+        <DeferredPage><PlayerProfile modal /></DeferredPage>
       </div>
     </div>
   );

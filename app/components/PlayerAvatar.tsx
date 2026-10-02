@@ -21,7 +21,9 @@ export function PlayerAvatar({
       aria-hidden="true"
     >
       {showingPhoto ? (
-        <img src={photoUrl} alt="" className="avatar-img" onError={() => setFailed(true)} />
+        <img src={photoUrl} alt="" className="avatar-img" width={size} height={size}
+          loading={size >= 100 ? "eager" : "lazy"} decoding="async"
+          onError={() => setFailed(true)} />
       ) : (
         <span className="avatar-monogram">{initials(name)}</span>
       )}
