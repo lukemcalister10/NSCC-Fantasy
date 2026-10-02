@@ -541,8 +541,6 @@
   .trades-page .trade-step-note { padding-left: 12px; }
   .trades-page .trade-cash { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .trades-page .trade-cash > span { padding: 8px 12px; }
-  .trades-page .trade-cash > span:last-child { padding-right: 32px; }
-  .trades-page .trade-cash > span:last-child strong { text-align: right; }
   .trades-page .picker-button { grid-template-columns: minmax(0, 1fr) 40px 72px 20px; gap: 0; padding: 8px 12px; }
   .trades-page .picker-name { grid-column: 1; grid-row: 1; white-space: normal; overflow-wrap: anywhere; }
   .trades-page .picker-button > .role-badge { grid-column: 2; grid-row: 1; justify-self: center; }
