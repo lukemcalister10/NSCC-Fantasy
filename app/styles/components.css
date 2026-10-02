@@ -621,6 +621,7 @@
 .profile-facts { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin: var(--sp-4) 0 0; }
 .profile-facts div { display: flex; flex-direction: column; gap: 2px; }
 .profile-facts dd { margin: 0; font-size: var(--fs-sm); font-weight: 700; }
+.profile-facts > div:nth-child(even) { text-align: right; }
 .profile-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
 .profile-price .movement { font-size: var(--fs-xs); }
 @media (max-width: 520px) {
@@ -790,6 +791,7 @@
 .previous-season-heading h3 {
   font-size: var(--fs-base);
 }
+.previous-season-heading .previous-season-matches { font-weight: 400; color: var(--ink-muted); white-space: nowrap; }
 .previous-season-heading span {
   color: var(--ink-faint);
   font-size: var(--fs-xs);
@@ -801,13 +803,14 @@
 }
 .previous-season-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
   margin: 0;
 }
 .previous-season-stats div {
   min-width: 0;
 }
+.previous-season-stats > div:nth-child(even) { text-align: right; }
 .previous-season-stats dt {
   color: var(--ink-faint);
   font-size: var(--fs-xs);
@@ -820,7 +823,7 @@
   .previous-season-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .previous-season-heading { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .previous-season-heading { display: block; }
   .previous-season-row { padding: var(--sp-3); }
 }
 

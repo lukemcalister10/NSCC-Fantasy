@@ -69,10 +69,9 @@ function PreviousSeasonStats({ lines }: { lines: PreviousSeasonLine[] }) {
           <section className="previous-season-row" key={`${line.association}-${line.teamName}`}>
             <div className="previous-season-heading">
               <div>
-                <h3>{line.grade}</h3>
+                <h3>{line.grade}<span className="previous-season-matches"> – {line.matches} matches</span></h3>
                 <span>{line.association}</span>
               </div>
-              <strong className="num">{line.matches} matches</strong>
             </div>
             <dl className="previous-season-stats">
               <div><dt>Runs</dt><dd className="num">{line.runs}</dd></div>
@@ -81,8 +80,6 @@ function PreviousSeasonStats({ lines }: { lines: PreviousSeasonLine[] }) {
               <div><dt>Wickets</dt><dd className="num">{line.wickets}</dd></div>
               <div><dt>Bowl avg</dt><dd className="num">{decimal(line.bowlingAverage)}</dd></div>
               <div><dt>Best</dt><dd className="num">{line.bestBowling ?? "—"}</dd></div>
-              <div><dt>Catches</dt><dd className="num">{line.catches}</dd></div>
-              {line.stumpings > 0 ? <div><dt>Stumpings</dt><dd className="num">{line.stumpings}</dd></div> : null}
             </dl>
           </section>
         ))}
