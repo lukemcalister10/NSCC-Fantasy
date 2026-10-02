@@ -92,7 +92,9 @@ function buildRaw(withExtra: boolean): RawSeason {
       { id: PAD_BWL, registryKey: PAD_BWL, displayName: "PadBwl", role: "BWL", wkEligible: false, startingPrice: 9_000, active: true },
       { id: PAD_AR, registryKey: PAD_AR, displayName: "PadAr", role: "AR", wkEligible: false, startingPrice: 9_000, active: true },
     ],
-    rounds: [{ id: R1, seq: 1, name: "R1", lockAt: "2026-10-01T00:30:00Z" }],
+    // Setup writes must remain pre-lock whenever the suite runs. Lock enforcement
+    // itself is covered in g4.lock-enforcement.test.ts.
+    rounds: [{ id: R1, seq: 1, name: "R1", lockAt: new Date(Date.now() + 86400000).toISOString() }],
     matches: [
       {
         id: M1,

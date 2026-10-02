@@ -98,15 +98,8 @@ export function Players() {
   );
 
   return (
-    <div className="page">
+    <div className="page players-page compact-page">
       <h1 className="page-title">Players</h1>
-      <p className="page-sub">Prices update once per completed match.</p>
-
-      <div className="toolbar">
-        {players.data ? (
-          <span className="toolbar-count">{players.data.length} players</span>
-        ) : null}
-      </div>
 
       {season.isLoading || players.isLoading || rounds.isLoading || averages.isLoading || lastRoundScores.isLoading || ownership.isLoading ? (
         <Loading />
@@ -139,14 +132,14 @@ export function Players() {
               <Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} aria-label={`View ${p.display_name}`}><PlayerAvatar name={p.display_name} size={54} photoUrl={p.photo_url} /></Link>
               <div className="players-mobile-main">
                 <span className="squad-player-name-row"><Link to={`/players/${p.id}`} state={{ backgroundLocation: location }} className="players-name-link">{p.display_name}</Link><PlayerAvailabilityDot status={availability.data?.get(p.id)} /></span>
-                <RoleBadge role={p.role} wkEligible={p.wk_eligible} />
+                <div className="players-mobile-price"><strong className="num">{money(p.currentPrice)}</strong><span className="players-price-change">(<PriceMovement delta={p.movement} />)</span></div>
               </div>
-              <div className="players-mobile-price"><strong className="num">{money(p.currentPrice)}</strong><PriceMovement delta={p.movement} /></div>
+              <div className="players-mobile-role"><RoleBadge role={p.role} wkEligible={p.wk_eligible} /></div>
               <div className="players-mobile-stats">
                 <span>Avg <strong className="num">{averages.data?.has(p.id) ? averages.data.get(p.id)!.toFixed(1) : "—"}</strong></span>
-                <span>Last {lastCompletedRound ? `R${lastCompletedRound.seq}` : "round"} <strong className="num">{lastRoundScores.data?.get(p.id) ?? "—"}</strong></span>
+                <span>{lastCompletedRound ? `R${lastCompletedRound.seq} Score` : "Round score"} <strong className="num">{lastRoundScores.data?.get(p.id) ?? "—"}</strong></span>
                 <span>Ownership <strong className="num">{ownershipRound ? owned.get(p.id) ?? 0 : "—"}</strong></span>
-                <span>Change <strong className="num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</strong></span>
+                <span>Ownership change <strong className="num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</strong></span>
               </div>
             </div>
           ))}
@@ -158,7 +151,7 @@ export function Players() {
               {headings.map(({ key, label, title }) => (
                 <th key={key} className={key === "name" || key === "role" ? undefined : "col-num"} aria-sort={sort === key ? descending ? "descending" : "ascending" : "none"}>
                   <button type="button" className="players-sort" title={title} onClick={() => changeSort(key)}>
-                    {key === "lastRound" && lastCompletedRound ? `${label} (R${lastCompletedRound.seq})` : label}<span aria-hidden="true">{sort === key ? descending ? " ↓" : " ↑" : " ↕"}</span>
+                    {key === "lastRound" && lastCompletedRound ? `R${lastCompletedRound.seq} Score` : label}<span aria-hidden="true">{sort === key ? descending ? " ↓" : " ↑" : " ↕"}</span>
                   </button>
                 </th>
               ))}

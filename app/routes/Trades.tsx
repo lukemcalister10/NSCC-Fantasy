@@ -98,7 +98,7 @@ export function Trades() {
   const buys = [...buyIds]
     .map((id) => state.poolById.get(id))
     .filter((p): p is PoolPlayer => !!p);
-  const { saleProceeds, buyCost, cashAvailable, capAfter } = tradeBatchTotals(
+  const { buyCost, cashAvailable, capAfter } = tradeBatchTotals(
     state.capRemaining ?? 0,
     sells.map((h) => h.currentPrice ?? 0),
     buys.map((p) => p.priceEnteringRound ?? 0),
@@ -242,11 +242,12 @@ export function Trades() {
   };
 
   return (
-    <div className="page">
+    <div className="page trades-page compact-page">
+      <div className="compact-page-heading">
       <h1 className="page-title">Trades</h1>
-      <TeamTabs />
-
       <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />
+      </div>
+      <TeamTabs />
       {resultsPending ? (
         <div className="lock-notice" role="status">
           Trading is paused while the previous round's results and prices are processed.
@@ -289,7 +290,7 @@ export function Trades() {
       />
 
       <div className="trade-cash" aria-label="Trade budget">
-        <span>Cash to spend <strong className="num">{money(cashAvailable)}</strong><small>{money(state.capRemaining)} spare + {money(saleProceeds)} from sales</small></span>
+        <span>Cash to spend <strong className="num">{money(cashAvailable)}</strong></span>
         <span>Trade-ins cost <strong className="num">{money(buyCost)}</strong></span>
         <span>Cash left <strong className={`num${capAfter < 0 ? " over" : ""}`}>{money(capAfter)}</strong></span>
       </div>
@@ -297,7 +298,7 @@ export function Trades() {
       <div className="trade-grid">
         <section className="trade-side trade-out-side">
           <h2 className="section-title">1. Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
-          <p className="trade-step-note">{maxBatch > 0 ? `Select up to ${maxBatch} ${maxBatch === 1 ? "player" : "players"}. Their sale prices are added to the cash you can spend.` : "No trades are available for this round."}</p>
+          {maxBatch === 0 ? <p className="trade-step-note">No trades are available for this round.</p> : null}
           <ul className="picker-list">
             {state.holdings.map((h) => {
               const selected = sellIds.has(h.playerId);
@@ -348,7 +349,7 @@ export function Trades() {
               <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
             </div>
           </div>
-          <p className="trade-step-note">{sells.length === 0 ? "Select a player to trade out first. Then choose the same number of replacements." : "Choose the same number of replacements. Any mix of roles is fine if the final squad meets its requirements."}</p>
+          {sells.length === 0 ? <p className="trade-step-note">Select a player to trade out first.</p> : null}
           <PoolPicker
             pool={state.pool.filter(
               (p) => !state.holdings.some((h) => h.playerId === p.id),

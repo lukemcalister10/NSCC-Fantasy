@@ -194,28 +194,16 @@ export function Team() {
           : null;
 
   return (
-    <div className="page">
-      {/* Inline layout rather than a new class: app/styles/team.css is outside this
-          slice's fences, so the rename control is placed without editing it. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: "var(--sp-2)",
-          flexWrap: "wrap",
-        }}
-      >
+    <div className="page team-page compact-page">
+      <div className="compact-page-heading">
         <h1 className="page-title">{state.team.name}</h1>
-        <TeamNameEditor
+        <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />
+      </div>
+      <TeamTabs action={<TeamNameEditor
           teamId={state.team.id}
           name={state.team.name}
           onRenamed={() => state.refetch()}
-        />
-      </div>
-      <TeamTabs />
-
-      <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />
+        />} />
       {refusal ? <RefusalNotice refusal={refusal} /> : null}
 
       {state.capRemaining !== null &&

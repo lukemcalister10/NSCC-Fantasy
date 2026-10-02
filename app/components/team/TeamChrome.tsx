@@ -5,14 +5,13 @@ import { money, dateTime } from "../../lib/format";
 import type { Refusal } from "../../lib/teamMutations";
 import {
   compositionProgress,
-  flexSlots,
   type RoleCarrier,
   type TradeBudget,
 } from "../../lib/squad";
 import type { RoundBasic } from "../../lib/teamQueries";
 
 /** Tabs for the team area. Trades live INSIDE /team rather than beside it. */
-export function TeamTabs() {
+export function TeamTabs({ action }: { action?: ReactNode }) {
   return (
     <nav className="team-tabs" aria-label="Team sections">
       <NavLink
@@ -28,6 +27,7 @@ export function TeamTabs() {
       >
         Trades
       </NavLink>
+      {action ? <div className="team-tab-action">{action}</div> : null}
     </nav>
   );
 }
@@ -45,7 +45,6 @@ export function TeamTabs() {
  * the cap.
  */
 export function CapStrip({
-  cap,
   capRemaining,
   investedValue,
   teamValue,
@@ -61,17 +60,14 @@ export function CapStrip({
       <div className={`cap-cell${over ? " cap-cell-over" : ""}`}>
         <span className="cap-label">Cap remaining</span>
         <span className="cap-figure num">{money(capRemaining)}</span>
-        <span className="cap-note">of {money(cap)} salary cap</span>
       </div>
       <div className="cap-cell">
         <span className="cap-label">Team value</span>
         <span className="cap-figure num">{money(teamValue)}</span>
-        <span className="cap-note">cap remaining + current prices</span>
       </div>
       <div className="cap-cell">
-        <span className="cap-label">Invested value</span>
+        <span className="cap-label">Player value</span>
         <span className="cap-figure num">{money(investedValue)}</span>
-        <span className="cap-note">current prices of holdings only</span>
       </div>
     </div>
   );
@@ -91,7 +87,6 @@ export function CompositionMeter({
   squad: SquadConfig;
 }) {
   const rows = compositionProgress(players, squad);
-  const flex = flexSlots(squad);
   const sizeMet = players.length === squad.teamSize;
   return (
     <div className="composition" aria-label="Squad composition">
@@ -109,10 +104,6 @@ export function CompositionMeter({
           </span>
         </div>
       ))}
-      <div className="comp-chip comp-flex">
-        <span className="comp-role">FLEX</span>
-        <span className="comp-count num">{flex}</span>
-      </div>
     </div>
   );
 }

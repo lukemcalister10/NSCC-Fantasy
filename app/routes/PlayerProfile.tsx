@@ -145,13 +145,14 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
             <div className="profile-price num">
               <span className="profile-price-label">Current price</span>
               <strong>{money(p.currentPrice)}</strong>
+              <span className="profile-price-label">Season change</span>
+              <PriceMovement delta={overallMove} />
             </div>
           </div>
           <dl className="profile-facts">
             <div><dt>Matches</dt><dd className="num">{played}</dd></div>
             <div><dt>Season points</dt><dd className="num">{totalPoints(p)}</dd></div>
             <div><dt>Season average</dt><dd className="num">{played ? (totalPoints(p) / played).toFixed(1) : "—"}</dd></div>
-            <div><dt>Price change</dt><dd className="num"><PriceMovement delta={overallMove} /></dd></div>
             <div><dt>Ownership</dt><dd className="num">{popularity.isLoading ? "—" : `${Math.round(popularity.data?.percentage ?? 0)}%`}</dd></div>
           </dl>
         </div>

@@ -8,6 +8,39 @@
  * readouts (so nothing here uses it), green/red for price movement.
  */
 
+/* Compact phone squad cards keep every stat and captain action visible. */
+@media (max-width: 700px) {
+  .team-page .cap-cell { padding: var(--sp-2); min-width: 0; }
+  .team-page .cap-label { font-size: 10px; letter-spacing: 0; }
+  .team-page .cap-figure { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+  .team-page .cap-strip, .team-page .composition, .team-tabs { margin-bottom: var(--sp-2); }
+  .team-page .composition { gap: 4px; }
+  .team-page .comp-chip { padding: 4px 6px; gap: 3px; font-size: 10px; }
+  .team-page .comp-role { font-size: 10px; }
+  .captain-full-label { display: none; }
+  .captain-short-label { display: inline; }
+  .squad-table { display: block; min-width: 0 !important; }
+  .squad-table colgroup, .squad-table thead { display: none; }
+  .squad-table tbody { display: block; }
+  .squad-table tbody tr { display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)) 88px; align-items: center; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
+  .squad-table tbody td { border: 0; padding: 0; min-width: 0; width: auto; }
+  .squad-table .squad-photo-col { grid-row: 1; grid-column: 1; }
+  .squad-table .team-name { grid-row: 1; grid-column: 2 / 5; white-space: normal; }
+  .squad-table .squad-player-name-row { flex-wrap: wrap; }
+  .squad-table .squad-role-col { grid-row: 2; grid-column: 1; }
+  .squad-table .squad-average-cell { grid-row: 2; grid-column: 2; }
+  .squad-table .squad-bought-cell { grid-row: 2; grid-column: 3; }
+  .squad-table .squad-current-cell { grid-row: 2; grid-column: 4 / 6; }
+  .squad-table .squad-price-change { grid-row: 3; grid-column: 2 / 6; text-align: right; }
+  .squad-table td[data-label]::before { content: attr(data-label); display: block; color: var(--ink-muted); font-size: 10px; font-family: inherit; }
+  .squad-table tbody td.col-captain-select { position: static; grid-row: 1; grid-column: 5; box-shadow: none; background: transparent !important; }
+  .squad-table .captain-choice { min-width: 42px; min-height: 44px; padding: 4px; }
+  .squad-table .squad-price-change::before { display: inline; margin-right: 6px; }
+  .squad-table .squad-money-content { font-size: 12px; }
+  .compact-page-heading .lock-notice { border: 0; background: transparent; color: var(--ink-muted); padding: 0; }
+  .trade-side > .trade-step-note { min-height: 0; }
+}
+
 /* ── tabs ─────────────────────────────────────────────────────────────────── */
 .team-tabs {
   display: flex;
@@ -26,11 +59,17 @@
 }
 .team-tab:hover { color: var(--ink); }
 .team-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+.team-tab-action { margin-left: auto; align-self: center; min-width: 0; }
+.team-tab-action > .btn-ghost { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
+.team-tab-action .register-card { max-width: 100%; }
+.team-tabs:has(.register-card) { flex-wrap: wrap; }
+.team-tabs:has(.register-card) .team-tab-action { flex-basis: 100%; }
+.captain-short-label { display: none; }
 
 /* ── cap strip (C3 / D8 / G2) ─────────────────────────────────────────────── */
 .cap-strip {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-2);
   margin-bottom: var(--sp-4);
 }

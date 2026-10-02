@@ -133,7 +133,7 @@ export function SquadTable({
                     ) : null}
                   </span>
                 </td>
-                <td className="col-num num">{averages.data?.has(h.playerId) ? averages.data.get(h.playerId)!.toFixed(1) : "—"}</td>
+                <td className="col-num num squad-average-cell" data-label="Avg">{averages.data?.has(h.playerId) ? averages.data.get(h.playerId)!.toFixed(1) : "—"}</td>
                 <td className="squad-role-col">
                   {h.player ? (
                     <RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} />
@@ -141,16 +141,16 @@ export function SquadTable({
                     "—"
                   )}
                 </td>
-                <td className="squad-money-cell num">
+                <td className="squad-money-cell num squad-bought-cell" data-label="Bought">
                   <span className="squad-money-content">{money(h.purchasePrice)}</span>
                 </td>
-                <td className="squad-money-cell num">
+                <td className="squad-money-cell num squad-current-cell" data-label="Current">
                   <span className="squad-money-content">{money(h.currentPrice)}</span>
                 </td>
-                <td className="col-num num squad-price-change">
+                <td className="col-num num squad-price-change" data-label="Gain">
                   <PriceMovement delta={gain} />
                 </td>
-                <td className="col-captain-select">
+                <td className="col-captain-select" data-label="CAPT">
                   <div
                     className="captain-selector"
                     role="group"
@@ -162,10 +162,11 @@ export function SquadTable({
                         captainId === h.playerId ? " captain-choice-active" : ""
                       }`}
                       aria-pressed={captainId === h.playerId}
+                      aria-label={`Captain ${h.player?.display_name ?? "player"}`}
                       disabled={captaincyDisabledReason !== null}
                       onClick={() => onSetCaptain(h.playerId)}
                     >
-                      CAPT
+                      <span className="captain-full-label">CAPT</span><span className="captain-short-label">C</span>
                     </button>
                     <button
                       type="button"
@@ -173,10 +174,11 @@ export function SquadTable({
                         viceCaptainId === h.playerId ? " captain-choice-active" : ""
                       }`}
                       aria-pressed={viceCaptainId === h.playerId}
+                      aria-label={`Vice captain ${h.player?.display_name ?? "player"}`}
                       disabled={captaincyDisabledReason !== null || captainId === h.playerId}
                       onClick={() => onSetViceCaptain(h.playerId)}
                     >
-                      VICE
+                      <span className="captain-full-label">VICE</span><span className="captain-short-label">V</span>
                     </button>
                   </div>
                 </td>
