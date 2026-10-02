@@ -93,9 +93,11 @@ hashes may differ between local and hosted builds because environment values dif
   deliberate investigation, a written reason and the documented override process;
   it must account for any trades made at published prices.
 
-## Next useful UI work
+## Mobile layout and photo follow-up
 
-The 2 October phone screenshots show readable Players/Ladder cards. Follow-ups are a
-more compact My Team value summary, squad statistics visible alongside captain controls,
-and investigation of the intermittent blank headshot shown for Mayur. These have not
-been implemented as part of the loading/documentation update.
+The 2 October mobile pass removes redundant Players copy, aligns player/profile stats,
+compacts the team value summary and uses squad cards with C/V controls on phones.
+Desktop tables remain. Trades retain validation and lockout explanations but lose
+repeated introductory copy. Headshots show initials while loading or on failure.
+Mayur's intermittent blank image was not reproduced; this fallback prevents an empty
+circle but is not proof of the original image-loading cause.

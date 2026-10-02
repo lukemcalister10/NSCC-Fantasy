@@ -12,7 +12,7 @@ export function PlayerAvatar({
 }) {
   const [failed, setFailed] = useState(false);
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
-  useEffect(() => { setFailed(false); setLoadedUrl(null); }, [photoUrl]);
+  useEffect(() => { setFailed(false); }, [photoUrl]);
   const showingPhoto = !!photoUrl && !failed;
   const style = { width: size, height: size, fontSize: Math.round(size * 0.4) };
   return (

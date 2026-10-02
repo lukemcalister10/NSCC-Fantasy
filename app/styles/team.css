@@ -18,7 +18,7 @@
   .team-page .comp-chip { padding: 4px 6px; gap: 3px; font-size: 10px; }
   .team-page .comp-role { font-size: 10px; }
   .captain-full-label { display: none; }
-  .captain-short-label { display: inline; }
+  .squad-table .captain-short-label { display: inline; }
   .squad-table { display: block; min-width: 0 !important; }
   .squad-table colgroup, .squad-table thead { display: none; }
   .squad-table tbody { display: block; }
@@ -30,15 +30,20 @@
   .squad-table .squad-role-col { grid-row: 2; grid-column: 1; }
   .squad-table .squad-average-cell { grid-row: 2; grid-column: 2; }
   .squad-table .squad-bought-cell { grid-row: 2; grid-column: 3; }
-  .squad-table .squad-current-cell { grid-row: 2; grid-column: 4 / 6; }
-  .squad-table .squad-price-change { grid-row: 3; grid-column: 2 / 6; text-align: right; }
+  .squad-table .squad-current-cell { grid-row: 2; grid-column: 4; }
+  .squad-table tbody td.squad-price-change { grid-row: 2; grid-column: 5; text-align: center; font-size: 10px; }
+  .squad-table .squad-price-change .movement { font-size: 10px; }
   .squad-table td[data-label]::before { content: attr(data-label); display: block; color: var(--ink-muted); font-size: 10px; font-family: inherit; }
   .squad-table tbody td.col-captain-select { position: static; grid-row: 1; grid-column: 5; box-shadow: none; background: transparent !important; }
   .squad-table .captain-choice { min-width: 42px; min-height: 44px; padding: 4px; }
-  .squad-table .squad-price-change::before { display: inline; margin-right: 6px; }
-  .squad-table .squad-money-content { font-size: 12px; }
+  .squad-table .squad-money-content { display: block; font-size: 10px; }
   .compact-page-heading .lock-notice { border: 0; background: transparent; color: var(--ink-muted); padding: 0; }
   .trade-side > .trade-step-note { min-height: 0; }
+}
+@media (max-width: 359px) {
+  .squad-table .squad-current-cell { grid-column: 4 / 6; }
+  .squad-table tbody td.squad-price-change { grid-row: 3; grid-column: 2 / 6; text-align: right; }
+  .squad-table tbody td.squad-price-change::before { display: inline; margin-right: 6px; }
 }
 
 /* ── tabs ─────────────────────────────────────────────────────────────────── */
