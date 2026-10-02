@@ -11,7 +11,7 @@ import { ROLE_ORDER } from "../../lib/squad";
 import type { PoolPlayer } from "../../lib/teamQueries";
 import type { HoldingView } from "../../lib/useTeamState";
 import { BlockedReason } from "./TeamChrome";
-import { usePlayerAverages } from "../../lib/queries";
+import { usePlayerScoringStats } from "../../lib/queries";
 
 /**
  * THE SQUAD (holdings). There is no bench and no emergency mechanic (operator
@@ -40,7 +40,7 @@ export function SquadTable({
   availability: Map<string, PlayerAvailabilityStatus>;
 }) {
   const location = useLocation();
-  const averages = usePlayerAverages(seasonId);
+  const scoringStats = usePlayerScoringStats(seasonId);
   const squadRoleOrder: PlayerRole[] = ["BAT", "WK", "AR", "BWL"];
   const sortedHoldings = useMemo(
     () =>
@@ -109,6 +109,10 @@ export function SquadTable({
                       photoUrl={h.player.photo_url}
                     />
                   ) : null}
+                  <span className="squad-mobile-average">
+                    <span>Avg</span>
+                    <strong>{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</strong>
+                  </span>
                 </td>
                 <td className="team-name">
                   <span className="squad-player">
@@ -127,6 +131,10 @@ export function SquadTable({
                       <PlayerAvailabilityDot status={availability.get(h.playerId)} />
                       {h.player ? <span className="squad-mobile-role"><RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} /></span> : null}
                     </span>
+                    <span className="squad-mobile-price">
+                      {money(h.currentPrice)} <span className="squad-mobile-gain" title="Gain or loss since purchase">(<PriceMovement delta={gain} />)</span>
+                    </span>
+                    <span className="squad-mobile-matches">Matches <strong>{scoringStats.data ? (scoringStats.data.get(h.playerId)?.matches ?? 0) : "—"}</strong></span>
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress
@@ -134,7 +142,7 @@ export function SquadTable({
                     ) : null}
                   </span>
                 </td>
-                <td className="col-num num squad-average-cell" data-label="Avg">{averages.data?.has(h.playerId) ? averages.data.get(h.playerId)!.toFixed(1) : "—"}</td>
+                <td className="col-num num squad-average-cell" data-label="Avg">{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</td>
                 <td className="squad-role-col">
                   {h.player ? (
                     <RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} />

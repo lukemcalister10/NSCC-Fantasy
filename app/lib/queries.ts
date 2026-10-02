@@ -340,12 +340,12 @@ export function usePlayers(seasonId: string | undefined, includeInactive = false
 }
 
 /** Fantasy points per played match, excluding DNP score rows. */
-export function usePlayerAverages(seasonId: string | undefined) {
+export function usePlayerScoringStats(seasonId: string | undefined) {
   return useQuery({
     queryKey: ["player-averages", seasonId],
     enabled: !!seasonId,
     staleTime: STALE,
-    queryFn: async (): Promise<Map<string, number>> => {
+    queryFn: async (): Promise<Map<string, { matches: number; average: number }>> => {
       const rows = unwrap<{
         id: string;
         player_match_scores: { played: boolean; base: number }[];
@@ -357,11 +357,19 @@ export function usePlayerAverages(seasonId: string | undefined) {
       return new Map(rows.flatMap((row) => {
         const played = row.player_match_scores.filter((score) => score.played);
         return played.length
-          ? [[row.id, played.reduce((sum, score) => sum + score.base, 0) / played.length] as const]
+          ? [[row.id, { matches: played.length, average: played.reduce((sum, score) => sum + score.base, 0) / played.length }] as const]
           : [];
       }));
     },
   });
+}
+
+export function usePlayerAverages(seasonId: string | undefined) {
+  const stats = usePlayerScoringStats(seasonId);
+  return {
+    ...stats,
+    data: stats.data ? new Map([...stats.data].map(([id, stat]) => [id, stat.average])) : undefined,
+  };
 }
 
 /** One published round's actual scores. No row means DNP; a row with base 0 means played. */
