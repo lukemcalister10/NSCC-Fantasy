@@ -125,6 +125,7 @@ export function SquadTable({
                         "—"
                       )}
                       <PlayerAvailabilityDot status={availability.get(h.playerId)} />
+                      {h.player ? <span className="squad-mobile-role"><RoleBadge role={h.player.role} wkEligible={h.player.wk_eligible} /></span> : null}
                     </span>
                     {h.midMatchLocked ? (
                       <BlockedReason>
@@ -150,7 +151,7 @@ export function SquadTable({
                 <td className="col-num num squad-price-change" data-label="Gain">
                   <PriceMovement delta={gain} />
                 </td>
-                <td className="col-captain-select" data-label="CAPT">
+                <td className="col-captain-select">
                   <div
                     className="captain-selector"
                     role="group"

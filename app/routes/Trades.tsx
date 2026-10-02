@@ -297,7 +297,7 @@ export function Trades() {
 
       <div className="trade-grid">
         <section className="trade-side trade-out-side">
-          <h2 className="section-title">1. Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
+          <h2 className="section-title">Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
           {maxBatch === 0 ? <p className="trade-step-note">No trades are available for this round.</p> : null}
           <ul className="picker-list">
             {state.holdings.map((h) => {
@@ -343,7 +343,7 @@ export function Trades() {
 
         <section className="trade-side trade-in-side">
           <div className="trade-in-heading">
-            <h2 className="section-title">2. Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
+            <h2 className="section-title">Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
             <div className="trade-role-controls">
               <span className="trade-filter-label">Filter trade-ins by role</span>
               <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
