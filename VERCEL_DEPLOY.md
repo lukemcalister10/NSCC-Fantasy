@@ -1,5 +1,10 @@
 # VERCEL_DEPLOY — read-only league views, deploy runbook
 
+> **Historical first-deployment reference.** The app now includes participant writes,
+> manager screens and server endpoints. Use [README.md](README.md) and
+> [MAINTENANCE.md](MAINTENANCE.md) for the current setup and deployment checks.
+> Do not re-seed the active competition using the initial setup instructions below.
+
 State-stamp: as-of 2026-07-09 · deploys the **frontend league-views slice** (login · ladder +
 overall leaderboard · player price list · player profile · rounds/fixtures) · builds against
 KICKOFF v1.2 / DoD v1.2 / DECISION_LOG v1.7. This runbook takes an operator from a **fresh

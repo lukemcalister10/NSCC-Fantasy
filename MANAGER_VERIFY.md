@@ -1,5 +1,10 @@
 # MANAGER_VERIFY — manager core (S-A), apply + verify runbook
 
+> **Historical setup reference.** For the active season's weekly publication, connection
+> checks and current limitations, start with [MAINTENANCE.md](MAINTENANCE.md). Photos,
+> availability, batch trades, undo and freeze coverage checks now exist. Do not repeat
+> old migration/seed steps against production merely because they appear below.
+
 State-stamp: as-of 07/08/2026 · slice **S-A manager core** · builds against KICKOFF v1.3 /
 DEFINITION_OF_DONE v1.2 (frozen) / DECISION_LOG **v1.9** · continues from `main @ e698c77`.
 

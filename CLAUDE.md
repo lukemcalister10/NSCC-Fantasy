@@ -14,6 +14,11 @@ anything worth keeping lives here or in the governance docs.
 
 ## Where things live
 
+- Current app overview: `README.md`. Current operating/deployment guide and known
+  limitations: `MAINTENANCE.md` (updated 2 October 2026). Start there for season work.
+- Old slice reports and setup runbooks are historical evidence, not current feature
+  status or instructions to reapply seeds/migrations to the active competition.
+
 - Governance: `KICKOFF.md` (v1.1), `DEFINITION_OF_DONE.md` (v1.1, frozen gates),
   `DECISION_LOG.md` (v1.7, locked + open items). Read these first every session.
 - Report per Standing Rule §1 in `README.md`: plain read + operator decisions on
