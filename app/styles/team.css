@@ -36,12 +36,14 @@
   .squad-table td[data-label]::before { content: attr(data-label); display: block; color: var(--ink-muted); font-size: 10px; font-family: inherit; }
   .squad-table tbody td.col-captain-select { position: static; grid-row: 1; grid-column: 5; box-shadow: none; background: transparent !important; }
   .squad-table .captain-choice { min-width: 42px; min-height: 44px; padding: 4px; }
-  .squad-table .squad-money-content { display: block; font-size: 10px; }
+  .squad-table .squad-money-content { display: block; font-size: 11px; }
+  .squad-table .squad-player-link { overflow-wrap: anywhere; }
   .compact-page-heading .lock-notice { border: 0; background: transparent; color: var(--ink-muted); padding: 0; }
   .trade-side > .trade-step-note { min-height: 0; }
 }
 @media (max-width: 359px) {
-  .squad-table .squad-current-cell { grid-column: 4 / 6; }
+  .squad-table .squad-bought-cell { grid-column: 3 / 5; }
+  .squad-table .squad-current-cell { grid-column: 5; }
   .squad-table tbody td.squad-price-change { grid-row: 3; grid-column: 2 / 6; text-align: right; }
   .squad-table tbody td.squad-price-change::before { display: inline; margin-right: 6px; }
 }

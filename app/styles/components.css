@@ -500,7 +500,7 @@
     padding: var(--sp-2) var(--sp-3);
   }
   .players-mobile-main { min-width: 0; }
-  .players-mobile-main .players-name-link { color: var(--ink); font-weight: 700; }
+  .players-mobile-main .players-name-link { color: var(--ink); font-weight: 700; overflow-wrap: anywhere; }
   .players-mobile-main .squad-player-name-row { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .players-mobile-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-top: 3px; font-size: var(--fs-sm); }
   .players-price-change { display: inline-flex; align-items: baseline; color: var(--ink-muted); font-size: var(--fs-xs); }
