@@ -139,7 +139,7 @@ export function Players() {
                 <span>Avg <strong className="num">{averages.data?.has(p.id) ? averages.data.get(p.id)!.toFixed(1) : "—"}</strong></span>
                 <span>{lastCompletedRound ? `R${lastCompletedRound.seq} Score` : "Round score"} <strong className="num">{lastRoundScores.data?.get(p.id) ?? "—"}</strong></span>
                 <span>Ownership <strong className="num">{ownershipRound ? owned.get(p.id) ?? 0 : "—"}</strong></span>
-                <span>Ownership change <strong className="num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</strong></span>
+                <span aria-label="Ownership change">Own. Change <strong className="num">{previousRound ? `${(changes.get(p.id) ?? 0) > 0 ? "+" : ""}${changes.get(p.id) ?? 0}` : "—"}</strong></span>
               </div>
             </div>
           ))}
