@@ -136,6 +136,11 @@ export function SquadTable({
                     <span className="squad-mobile-price">
                       {money(h.currentPrice)} <span className="squad-mobile-gain" title="Gain or loss since purchase">(<PriceMovement delta={gain} />)</span>
                     </span>
+                    <span className="squad-mobile-stats">
+                      <span>Avg: <strong>{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</strong>,</span>
+                      <span>Matches: <strong>{scoringStats.data ? (scoringStats.data.get(h.playerId)?.matches ?? 0) : "—"}</strong>,</span>
+                      <span>Ownership: <strong>{ownership.data && roundId ? `${ownershipByPlayer.get(h.playerId) ?? 0}%` : "—"}</strong></span>
+                    </span>
                     {h.midMatchLocked ? (
                       <BlockedReason>
                         <span aria-hidden="true">🔒</span> match in progress
@@ -191,11 +196,6 @@ export function SquadTable({
                       <span className="captain-full-label">VICE</span><span className="captain-short-label">V</span>
                     </button>
                   </div>
-                </td>
-                <td className="squad-mobile-stats" colSpan={8}>
-                  <span>Avg: <strong>{scoringStats.data?.get(h.playerId)?.average.toFixed(1) ?? "—"}</strong>,</span>
-                  <span>Matches: <strong>{scoringStats.data ? (scoringStats.data.get(h.playerId)?.matches ?? 0) : "—"}</strong>,</span>
-                  <span>Ownership: <strong>{ownership.data && roundId ? `${ownershipByPlayer.get(h.playerId) ?? 0}%` : "—"}</strong></span>
                 </td>
               </tr>
             );
