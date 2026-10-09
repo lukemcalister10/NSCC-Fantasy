@@ -16,6 +16,35 @@ const players = [
 ];
 
 describe("club availability matching", () => {
+  it.each([
+    ["Andrew Castellano", "Andy Castellano"],
+    ["Douglas Clark", "Doug Clark"],
+    ["James St Julian", "James St Julien"],
+    ["Nishchal Pangeni", "Nish Pangeni"],
+    ["Surasan Wunnacharoensri", "Sam Wunnacharoensri"],
+  ])("links club name %s to fantasy name %s without renaming it", (clubName, fantasyName) => {
+    const identities = [{ id: "linked-player", registry_key: fantasyName, display_name: fantasyName }];
+    const feed: ClubAvailabilityMatch[] = [{
+      team: "1st XI", opponent: "Beacon Hill Hawks", round: "Round 2", players: [
+        { playerId: "club-player", name: clubName, status: "selected", role: "core" },
+      ],
+    }];
+    const result = mapClubAvailability(round, identities, feed);
+    expect(result.statuses.get("linked-player")).toBe("available");
+    expect(result.unmatched).toEqual([]);
+    expect(identities[0]!.display_name).toBe(fantasyName);
+  });
+
+  it("keeps James linked after his display name is corrected, preserving his registry key", () => {
+    const identities = [{ id: "james", registry_key: "James St Julien", display_name: "James St Julian" }];
+    const feed: ClubAvailabilityMatch[] = [{
+      team: "1st XI", opponent: "Beacon Hill Hawks", round: "Round 2", players: [
+        { playerId: "club-james", name: "James St Julian", status: "selected", role: "core" },
+      ],
+    }];
+    expect(mapClubAvailability(round, identities, feed).statuses.get("james")).toBe("available");
+  });
+
   it("matches a shortened player by stable club ID and a new player by confirmed alias", () => {
     const feed: ClubAvailabilityMatch[] = [
       { team: "1st XI", opponent: "Beacon Hill Hawks", round: "Round 2", players: [

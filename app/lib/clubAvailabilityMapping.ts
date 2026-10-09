@@ -26,8 +26,11 @@ export interface AvailabilityRound {
 
 // Confirmed club/fantasy name variants not covered by the previous-season ID map.
 const clubAliases: Record<string, string> = {
+  "andrew castellano": "andy castellano",
   "benjamin o'sullivan": "ben o'sullivan",
   "charles antoniades": "charlie antoniades",
+  "douglas clark": "doug clark",
+  "james st julian": "james st julien",
   "jaan tulsani": "jaan tulsiani",
   "jonathan villanueva": "jono villanueva",
   "joseph whyte": "joe whyte",
@@ -37,10 +40,12 @@ const clubAliases: Record<string, string> = {
   "matthew smith": "mat smith",
   "mohammed hasnain": "mohammad hasnain",
   "nicholas paton": "nick paton",
+  "nishchal pangeni": "nish pangeni",
   "robert gower": "rob gower",
   "robert wong": "robbie wong",
   "sameer mutreja": "sameer muteja",
   "shivam patel": "shiv patel",
+  "surasan wunnacharoensri": "sam wunnacharoensri",
 };
 
 function uniqueNameMap(players: AvailabilityIdentity[]): Map<string, string | null> {
