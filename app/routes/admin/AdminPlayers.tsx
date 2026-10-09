@@ -78,7 +78,7 @@ export function AdminPlayers() {
         <AddPlayerForm
           seasonId={season.data.id}
           locked={locked}
-          floor={season.data.config.pricing.floor}
+          newcomerPrices={season.data.newcomer_role_prices}
         />
       </Section>
 
@@ -269,11 +269,11 @@ function summariseDetail(detail: Record<string, unknown>): string {
 function AddPlayerForm({
   seasonId,
   locked,
-  floor,
+  newcomerPrices,
 }: {
   seasonId: string;
   locked: boolean;
-  floor: number;
+  newcomerPrices: Record<PlayerRole, number> | null;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
@@ -281,10 +281,11 @@ function AddPlayerForm({
   const [wkEligible, setWkEligible] = useState(false);
   const [price, setPrice] = useState<string>("");
   const [done, setDone] = useState<string | null>(null);
+  const defaultPrice = newcomerPrices?.[role];
 
   const add = useMutation({
     mutationFn: async () => {
-      const startingPrice = price.trim() === "" ? (locked ? null : null) : Number(price);
+      const startingPrice = price.trim() === "" ? null : Number(price);
       return createPlayer(seasonId, {
         displayName: name,
         role,
@@ -293,14 +294,16 @@ function AddPlayerForm({
         active: true,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (created) => {
       setDone(
         locked
-          ? `Added mid-season. Price defaults to the config floor (${money(floor)}); the salary cap is unchanged (O3).`
+          ? `Added at ${money(created.starting_price)}. The salary cap is unchanged.`
           : "Added to the registry.",
       );
       setName("");
       setPrice("");
+      setRole("BAT");
+      setWkEligible(false);
       await qc.invalidateQueries({ queryKey: ["admin"] });
     },
   });
@@ -311,7 +314,7 @@ function AddPlayerForm({
     <div className="card" style={{ padding: "var(--sp-4)" }}>
       <p className="admin-note">
         {locked
-          ? "The season is locked, so a new player joins at the config floor unless you set a price. Adding a player does not change the salary cap — it was computed at lock and is frozen (O3/C4)."
+          ? "New players use the fixed pre-season median for their primary role unless you enter an override price. WK eligibility does not change that price. The salary cap is unchanged."
           : "Names are stored in their normalised form (D22) so inbound scorecards match them. Leave the price blank before lock; prices materialise when the season locks."}
       </p>
       <div className="admin-form-grid admin-form-grid-4">
@@ -335,12 +338,12 @@ function AddPlayerForm({
             style={{ width: "auto" }}
           />
         </Field>
-        <Field label="Starting price" hint={locked ? `blank = floor ${money(floor)}` : "optional"}>
+        <Field label="Starting price" hint={locked ? (defaultPrice ? `Automatic: ${money(defaultPrice)} (${role} pre-season median)` : "No benchmark configured — enter a price") : "optional"}>
           <input
             inputMode="numeric"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            placeholder={locked ? String(floor) : "—"}
+            placeholder={locked && defaultPrice ? String(defaultPrice) : "—"}
           />
         </Field>
       </div>
@@ -350,7 +353,7 @@ function AddPlayerForm({
       <div className="admin-actions">
         <button
           className="btn-primary btn-primary-inline"
-          disabled={canonical === "" || add.isPending}
+          disabled={canonical === "" || add.isPending || (locked && !defaultPrice && price.trim() === "") || (price.trim() !== "" && (!Number.isSafeInteger(Number(price)) || Number(price) <= 0))}
           onClick={() => {
             setDone(null);
             add.mutate();

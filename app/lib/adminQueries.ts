@@ -29,6 +29,7 @@ export interface AdminSeason {
   config: LeagueConfig;
   locked_at: string | null;
   created_at: string;
+  newcomer_role_prices: Record<PlayerRole, number> | null;
 }
 
 export function useAdminSeason() {
@@ -39,7 +40,7 @@ export function useAdminSeason() {
       const rows = unwrap<AdminSeason[]>(
         await supabase
           .from("seasons")
-          .select("id,name,config,locked_at,created_at")
+          .select("id,name,config,locked_at,created_at,newcomer_role_prices")
           .order("created_at", { ascending: false })
           .limit(1),
       );

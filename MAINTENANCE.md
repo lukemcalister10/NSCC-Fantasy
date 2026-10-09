@@ -1,6 +1,6 @@
 # NSCC Fantasy — current maintenance guide
 
-Updated 2 October 2026. This guide supersedes the weekly operating instructions in
+Updated 9 October 2026. This guide supersedes the weekly operating instructions in
 the pre-launch reports. Production: https://nsccfantasy.vercel.app/ . Manager: `/admin`.
 
 ## Publish a round
@@ -47,6 +47,35 @@ Manual verification in steps 3 and 6 remains necessary.
   blocked during the relevant lockout/results-pending states.
 - **Help text:** edit `app/routes/Help.tsx`, build and deploy. Preserve operator-written
   wording. Values generated from configuration should agree with the active season.
+
+## New-player pricing rollout (0020)
+
+Apply `supabase/migrations/0020_newcomer_role_prices.sql` before deploying the
+frontend that reads `seasons.newcomer_role_prices`. It changes defaults only;
+it does not correct existing players or rewrite results, trades or the cap.
+
+For the 2026/27 season, blank mid-season starting prices use the fixed D33
+pre-season returning-player medians: BAT $29,100; BWL $28,800; AR $38,600;
+WK $21,900. The primary role determines the benchmark, not WK eligibility.
+An explicit manager-entered price still overrides the default. The form resets
+role and WK eligibility after each successful addition to prevent carry-over.
+Future seasons need their own reviewed `newcomer_role_prices` set before season
+lock. These benchmarks freeze at lock; an unconfigured season rejects blank
+mid-season prices instead of silently using the pricing floor.
+
+Before retrospective corrections, run `scripts/audit-newcomer-prices.sql` in the
+SQL editor and review historical selections, purchases/sales and the published
+price path. Zero current ownership alone does not prove there were no buyers.
+Do not recompute frozen rounds just to fix a starting price without checking
+effects on historical ledgers and the pool-wide pricing calculation.
+
+On 9 October 2026, `scripts/repair-newcomer-prices.sql` corrected Lachlan Brown
+($28,800 seed, 4 points, $23,800 after Round 2) and Sharon Ben ($21,900 seed,
+5 points, $18,500 after Round 2). Neither had any trades or selections. The
+transaction retains recovery details in `player_registry_events`, verifies all
+other public-table data and other players/prices are unchanged, and restores
+the price-freeze trigger before commit. It deliberately refuses a second run.
+Roles and WK eligibility were not changed by this pricing repair.
 
 ## Connection and deployment checks
 

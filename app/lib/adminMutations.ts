@@ -54,14 +54,14 @@ export interface PlayerInput {
   role: PlayerRole;
   wkEligible: boolean;
   /** Omitted/NULL pre-lock is legal (prices materialise at lock, Rider 3); after
-   *  lock the database defaults it to the config floor (C4 mid-season add). */
+   *  lock the database defaults it to the frozen primary-role median (D33). */
   startingPrice: number | null;
   active: boolean;
 }
 
 export async function createPlayer(seasonId: string, input: PlayerInput) {
   const name = normaliseName(input.displayName);
-  return ok(
+  return ok<{ id: string; starting_price: number | null }>(
     await supabase
       .from("players")
       .insert({
@@ -73,7 +73,7 @@ export async function createPlayer(seasonId: string, input: PlayerInput) {
         starting_price: input.startingPrice,
         active: input.active,
       })
-      .select("id")
+      .select("id,starting_price")
       .single(),
     "add player",
   );

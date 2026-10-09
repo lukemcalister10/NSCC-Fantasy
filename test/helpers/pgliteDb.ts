@@ -74,7 +74,7 @@ function migrationSql(): string[] {
  * what makes the DB half of G3 (schema executes; no orphaned derived rows) and
  * the lock gates (G4/G6/G10 triggers) verifiable in CI / a cold-acceptance run.
  */
-export async function makeTestDb(): Promise<DbClient> {
+export async function makeTestDb(): Promise<DbClient & { exec(sql: string): Promise<void> }> {
   const pg = new PGlite();
   // The Supabase shim runs FIRST: 0004_rls.sql resolves auth.uid() at CREATE POLICY
   // time and grants to the anon/authenticated/service_role roles, all of which a real
@@ -82,6 +82,7 @@ export async function makeTestDb(): Promise<DbClient> {
   await pg.exec(SUPABASE_SHIM);
   for (const sql of migrationSql()) await pg.exec(sql);
   return {
+    async exec(sql: string) { await pg.exec(sql); },
     async query<T>(sql: string, params?: unknown[]) {
       const r = await pg.query(sql, params as never[]);
       return { rows: r.rows as T[] };

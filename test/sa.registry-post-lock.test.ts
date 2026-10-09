@@ -36,6 +36,7 @@ describe("registry — pre-lock edits, post-lock refusals, mid-season adds", () 
       "registry season",
       JSON.stringify(FIXTURE_CONFIG),
     ]);
+    await db.query("UPDATE seasons SET newcomer_role_prices = $2 WHERE id = $1", [SEASON, JSON.stringify({ BAT: 29100, BWL: 28800, AR: 38600, WK: 21900 })]);
     await db.query(
       "INSERT INTO profiles (id, display_name, is_league_manager) VALUES ($1,'The Manager',true), ($2,'A Participant',false)",
       [MANAGER, PARTICIPANT],
@@ -153,7 +154,7 @@ describe("registry — pre-lock edits, post-lock refusals, mid-season adds", () 
     expect(rows[0]!.display_name).toBe("Jo Whitlam-Reid");
   });
 
-  it("MID-SEASON ADD (C4): priced at the config floor by default, logged, cap untouched", async () => {
+  it("MID-SEASON ADD (D33): priced at the pre-season role median, logged, cap untouched", async () => {
     const capBefore = await db.query<{ cap: string }>(
       "SELECT config #>> '{squad,cap}' AS cap FROM seasons WHERE id = $1",
       [SEASON],
@@ -171,9 +172,7 @@ describe("registry — pre-lock edits, post-lock refusals, mid-season adds", () 
       "SELECT id, starting_price FROM players WHERE season_id = $1 AND display_name = 'Tomas Reiner'",
       [SEASON],
     );
-    // The FIXTURE floor ($9,000 here); the season economy's O6 floor in production.
-    // Read from the frozen config, never a constant in the migration (G11).
-    expect(added.rows[0]!.starting_price).toBe(FIXTURE_CONFIG.pricing.floor);
+    expect(added.rows[0]!.starting_price).toBe(28_800);
 
     const log = await db.query<{ event: string; actor: string; detail: { mid_season: boolean } }>(
       "SELECT event, actor, detail FROM player_registry_events WHERE player_id = $1",

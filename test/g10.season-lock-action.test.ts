@@ -70,6 +70,7 @@ function buildRaw(): RawSeason {
 async function seededDb(): Promise<DbClient> {
   const db = await makeTestDb();
   await seedSeason(db, buildRaw());
+  await db.query("UPDATE seasons SET newcomer_role_prices = $2 WHERE id = $1", [SEASON, JSON.stringify({ BAT: 29100, BWL: 28800, AR: 38600, WK: 21900 })]);
   await db.query(
     "INSERT INTO profiles (id, display_name, is_league_manager) VALUES ($1,'manager',true)",
     [MANAGER],
