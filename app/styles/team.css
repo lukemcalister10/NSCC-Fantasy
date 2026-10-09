@@ -407,16 +407,13 @@
 .trade-out-side { grid-area: out; }
 .trade-in-side { grid-area: in; }
 .trade-side .section-title { margin: 0 0 var(--sp-2); }
-.trade-in-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-2); }
-.trade-in-heading .section-title { margin: 0; }
+.trade-side-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); min-height: 28px; margin-bottom: var(--sp-2); }
+.trade-side-heading .section-title { margin: 0; }
 .trade-role-controls .picker-roles { gap: 2px; }
 .trade-role-controls .picker-role { padding: var(--sp-1) var(--sp-2); font-size: 10px; }
 .trade-filter-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .trade-step-count { color: var(--ink-muted); font-size: var(--fs-sm); font-weight: 500; }
 .trade-step-note { margin: 0 0 var(--sp-3); color: var(--ink-muted); font-size: var(--fs-sm); line-height: 1.4; }
-@media (min-width: 800px) {
-  .trade-side > .trade-step-note { min-height: 2.8em; }
-}
 .trade-side .picker-list {
   height: calc(9 * 3rem + 2px);
   max-height: calc(9 * 3rem + 2px);
@@ -535,7 +532,7 @@
   .squad-table .captain-choice-active .captain-short-label { background: var(--accent); color: var(--accent-ink); }
 
   .trades-page .trade-budget { padding: 12px; }
-  .trades-page .trade-side > .section-title,
+  .trades-page .trade-side-heading > .section-title,
   .trades-page .trade-in-heading > .section-title,
   .trades-page .trade-step-note { padding-left: 12px; }
   .trades-page .trade-cash { grid-template-columns: repeat(3, minmax(0, 1fr)); }
