@@ -392,14 +392,14 @@
 .trade-grid {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-areas: "out" "in";
-  gap: var(--sp-4);
+  grid-template-areas: "out-heading" "out" "in-heading" "in";
+  gap: var(--sp-2) var(--sp-4);
   margin-bottom: var(--sp-4);
 }
 @media (min-width: 800px) {
   .trade-grid {
     grid-template-columns: 1fr 1fr;
-    grid-template-areas: "out in";
+    grid-template-areas: "out-heading in-heading" "out in";
   }
 }
 .trade-side { min-width: 0; }
@@ -407,8 +407,13 @@
 .trade-out-side { grid-area: out; }
 .trade-in-side { grid-area: in; }
 .trade-side .section-title { margin: 0 0 var(--sp-2); }
-.trade-side-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); min-height: 28px; margin-bottom: var(--sp-2); }
+.trade-out-heading { grid-area: out-heading; align-self: start; }
+.trade-in-heading { grid-area: in-heading; }
+.trade-side-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); min-height: 28px; min-width: 0; }
 .trade-side-heading .section-title { margin: 0; }
+.trade-playing-filter { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-basis: 100%; min-height: 28px; color: var(--ink-muted); font-size: var(--fs-sm); cursor: pointer; }
+.trade-playing-filter input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+@media (max-width: 799px) { .trade-in-heading { margin-top: var(--sp-2); } }
 .trade-role-controls .picker-roles { gap: 2px; }
 .trade-role-controls .picker-role { padding: var(--sp-1) var(--sp-2); font-size: 10px; }
 .trade-filter-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

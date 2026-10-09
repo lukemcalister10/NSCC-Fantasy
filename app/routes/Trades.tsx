@@ -31,6 +31,7 @@ import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 import { money } from "../lib/format";
 import { tradeBatchTotals } from "../lib/tradeBatch";
 import { completedTradeBatches } from "../lib/tradeUndo";
+import { filterTradeInPool } from "../lib/tradePoolFilter";
 import type { PoolPlayer } from "../lib/teamQueries";
 import "../styles/team.css";
 
@@ -59,6 +60,7 @@ export function Trades() {
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
+  const [onlyPlaying, setOnlyPlaying] = useState(false);
 
   const squad = state.config?.squad;
 
@@ -302,10 +304,10 @@ export function Trades() {
       ) : null}
 
       <div className="trade-grid">
-        <section className="trade-side trade-out-side">
-          <div className="trade-side-heading">
-            <h2 className="section-title">Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
-          </div>
+        <div className="trade-side-heading trade-out-heading">
+          <h2 id="trade-out-title" className="section-title">Trade out <span className="trade-step-count">{sells.length}/{maxBatch}</span></h2>
+        </div>
+        <section className="trade-side trade-out-side" aria-labelledby="trade-out-title">
           <ul className="picker-list">
             {state.holdings.map((h) => {
               const selected = sellIds.has(h.playerId);
@@ -348,21 +350,23 @@ export function Trades() {
           </ul>
         </section>
 
-        <section className="trade-side trade-in-side">
-          <div className="trade-side-heading trade-in-heading">
-            <h2 className="section-title">Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
-            <div className="trade-role-controls">
-              <span className="trade-filter-label">Filter trade-ins by role</span>
-              <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
-            </div>
+        <div className="trade-side-heading trade-in-heading">
+          <h2 id="trade-in-title" className="section-title">Trade in <span className="trade-step-count">{buys.length}/{sells.length}</span></h2>
+          <div className="trade-role-controls">
+            <span className="trade-filter-label">Filter trade-ins by role</span>
+            <PickerRoleFilters value={roleFilter} onChange={setRoleFilter} />
           </div>
+          <label className="trade-playing-filter">
+            <input type="checkbox" checked={onlyPlaying} onChange={(event) => setOnlyPlaying(event.target.checked)} />
+            Only show playing
+          </label>
+        </div>
+        <section className="trade-side trade-in-side" aria-labelledby="trade-in-title">
           <PoolPicker
-            pool={state.pool.filter(
-              (p) => !state.holdings.some((h) => h.playerId === p.id),
-            )}
+            pool={filterTradeInPool(state.pool, new Set(state.holdings.map(h => h.playerId)), state.availability, onlyPlaying)}
             selectedIds={buyIds}
             onToggle={chooseTradeIn}
-            emptyLabel="No available players."
+            emptyLabel={onlyPlaying ? "No green-dot players match these filters. Untick ‘Only show playing’ to see all players." : "No available players."}
             roleFilter={roleFilter}
             onRoleFilterChange={setRoleFilter}
             showRoleFilters={false}
