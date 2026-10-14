@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { generateRound } from "../../src/recompute/roundRobin";
 import type { PlayerRole } from "../../src/config/types";
 import { signPlayerPhotoPaths } from "./playerPhotos";
+import { completedLeaderboardRounds, type LeaderboardRound } from "./pointsLeaderboard";
 
 /**
  * Read layer. Every hook is a plain `supabase.from(...).select(...)` under the
@@ -278,6 +279,42 @@ export function useLeaderboard(seasonId: string | undefined) {
           .order("total_points", { ascending: false }),
       );
       return rows;
+    },
+  });
+}
+
+export function useCompletedLeaderboardRounds(seasonId: string | undefined) {
+  return useQuery({
+    queryKey: ["points-leaderboard-rounds", seasonId],
+    enabled: !!seasonId,
+    staleTime: STALE,
+    queryFn: async () => completedLeaderboardRounds(unwrap<LeaderboardRound[]>(
+      await supabase.from("rounds")
+        .select("id,seq,name,scorecards_frozen_at,matches(status)")
+        .eq("season_id", seasonId!)
+        .not("scorecards_frozen_at", "is", null),
+    )),
+  });
+}
+
+/** Read the authoritative published total, never reconstruct it from current squads. */
+export function useRoundLeaderboard(seasonId: string | undefined, roundId: string | undefined) {
+  return useQuery({
+    queryKey: ["round-points-leaderboard", seasonId, roundId],
+    enabled: !!seasonId && !!roundId,
+    staleTime: STALE,
+    queryFn: async (): Promise<LeaderboardRow[]> => {
+      const rows = unwrap<{ fantasy_team_id: string; total: number; fantasy_teams: { name: string } | null }[]>(
+        await supabase.from("team_round_scores")
+          .select("fantasy_team_id,total,fantasy_teams!inner(name,season_id)")
+          .eq("round_id", roundId!)
+          .eq("fantasy_teams.season_id", seasonId!),
+      );
+      return rows.map(row => ({
+        fantasy_team_id: row.fantasy_team_id,
+        total_points: row.total,
+        fantasy_teams: row.fantasy_teams,
+      }));
     },
   });
 }

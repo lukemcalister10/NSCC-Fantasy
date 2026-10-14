@@ -66,6 +66,13 @@
 }
 .team-tab:hover { color: var(--ink); }
 .team-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+.points-leaderboard-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.points-leaderboard-tabs { margin-bottom: 0; }
+.points-leaderboard-tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; }
+.points-leaderboard-tabs button.team-tab-active { border-bottom-color: var(--accent); }
+.points-round-picker { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.points-round-picker select { width: auto; min-width: 7rem; }
+.points-leaderboard-table .team-name { white-space: normal; overflow-wrap: anywhere; }
 .team-tab-action { margin-left: auto; align-self: center; min-width: 0; }
 .team-tab-action > .btn-ghost { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
 .team-tab-action .register-card { max-width: 100%; }
