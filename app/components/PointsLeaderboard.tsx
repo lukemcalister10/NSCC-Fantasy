@@ -31,7 +31,7 @@ export function PointsLeaderboard({ seasonId }: { seasonId: string | undefined }
         <button type="button" className={`team-tab${byRound ? " team-tab-active" : ""}`} aria-pressed={byRound} onClick={() => changeView(true)}>By round</button>
       </div>
       {byRound && selected ? <label className="points-round-picker">
-        Round
+        <span className="visually-hidden">Round</span>
         <select value={selected.id} onChange={event => {
           const id = event.target.value;
           setParams(previous => {
