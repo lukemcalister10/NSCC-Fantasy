@@ -80,6 +80,7 @@ export function AdminHome() {
             </li>
           </ul>
           <div className="admin-actions">
+            <Link className="btn-ghost" to="/admin/accounts">Account passwords</Link>
             <Link className="btn-ghost" to="/admin/players">
               Player registry
             </Link>

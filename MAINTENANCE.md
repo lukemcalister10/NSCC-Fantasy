@@ -93,6 +93,7 @@ Recheck after database credentials, certificates or deployment environments chan
 | `POSTGRES_URL` | Server only | Database connection for recompute and connection checks |
 | `POSTGRES_CA_CERT` | Server only | Public CA certificate used to verify the database TLS chain |
 | `CLUB_API_KEY` | Server only | Club availability endpoint |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production server only | Manager-authorised participant password updates; never browser or Preview |
 
 Never prefix database credentials or the club key with `VITE_`. Vite settings are
 baked into the frontend at build time; changes require a new deployment. Check Production
@@ -105,6 +106,10 @@ Verify the affected signed-in page, direct URL/refresh and any profile overlay. 
 hashes may differ between local and hosted builds because environment values differ.
 
 ## Recovery and known limitations
+
+Manual participant resets: see [MANUAL_PASSWORD_RESETS.md](docs/MANUAL_PASSWORD_RESETS.md).
+Use Manager → Account passwords after verifying the owner. Never log request bodies
+for that endpoint. A timeout is an uncertain result, not proof that no change occurred.
 
 - Headshot backup is covered by the operator's own copies; recovery work was declined.
 - Database safeguards and verified TLS have been reviewed. An isolated database restore

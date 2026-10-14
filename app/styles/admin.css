@@ -240,3 +240,7 @@
   margin: var(--sp-2) 0 0;
   padding-left: var(--sp-4);
 }
+/* Password fields stay private local form state, never echoed in status text. */
+.admin-password-form { max-width: 42rem; padding: var(--sp-4); display: grid; gap: var(--sp-3); }
+.admin-password-confirm { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-sm); }
+.admin-password-confirm input { width: auto; flex-shrink: 0; margin-top: 4px; }

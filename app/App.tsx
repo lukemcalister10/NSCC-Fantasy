@@ -27,6 +27,7 @@ const AdminPlayers = lazy(() => import("./routes/admin/AdminPlayers").then((m) =
 const AdminRounds = lazy(() => import("./routes/admin/AdminRounds").then((m) => ({ default: m.AdminRounds })));
 const AdminScorecards = lazy(() => import("./routes/admin/AdminScorecards").then((m) => ({ default: m.AdminScorecards })));
 const AdminSettings = lazy(() => import("./routes/admin/AdminSettings").then((m) => ({ default: m.AdminSettings })));
+const AdminAccounts = lazy(() => import("./routes/admin/AdminAccounts").then((m) => ({ default: m.AdminAccounts })));
 
 /**
  * Route map. `/login` is the only unauthenticated page; everything else sits
@@ -70,6 +71,7 @@ export function App() {
             <Route path="/admin/rounds" element={<DeferredPage><AdminRounds /></DeferredPage>} />
             <Route path="/admin/scorecards" element={<DeferredPage><AdminScorecards /></DeferredPage>} />
             <Route path="/admin/settings" element={<DeferredPage><AdminSettings /></DeferredPage>} />
+            <Route path="/admin/accounts" element={<DeferredPage><AdminAccounts /></DeferredPage>} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

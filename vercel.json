@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "functions": {
+    "api/admin-accounts.ts": { "maxDuration": 60 },
     "api/recompute.ts": {
       "maxDuration": 60
     },
