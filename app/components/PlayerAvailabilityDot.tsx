@@ -16,8 +16,8 @@ export function PlayerAvailabilityDot({status}:{status:PlayerAvailabilityStatus|
   },[position]);
   if(!status)return null;
   const value=asDated(status),label=availabilityLabel(status);
-  const color=(s:string|undefined)=>s==="available"?"var(--up)":s==="unavailable"?"var(--down)":"#9299a6";
-  const style:CSSProperties={background:value.days===2?`linear-gradient(135deg, ${color(value.day1)} 50%, ${color(value.day2)} 50%)`:color(value.day1)};
+  const color=(s:string|undefined)=>s==="available"?"var(--availability-green)":s==="unavailable"?"var(--availability-red)":"#9299a6";
+  const style:CSSProperties={background:value.days===2?`linear-gradient(112.5deg, ${color(value.day1)} 50%, ${color(value.day2)} 50%)`:color(value.day1)};
   return <span className="availability-dot" style={style} role="img" aria-label={label} title={label} tabIndex={0}
     onMouseEnter={e=>show(e.currentTarget)} onMouseLeave={()=>setPosition(null)} onFocus={e=>show(e.currentTarget)}
     onClick={e=>{e.stopPropagation();show(e.currentTarget)}} onBlur={()=>setPosition(null)} onKeyDown={e=>{if(e.key==="Escape")setPosition(null);if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();show(e.currentTarget)}}}>

@@ -59,9 +59,9 @@ describe('two-day availability',()=>{
   const values=new Map([['a',{days:2 as const,dates,day1:'available' as const}],['b',{days:2 as const,dates,day2:'available' as const}],['u',{days:2 as const,dates}],['n',{days:2 as const,dates,day1:'unavailable' as const,day2:'unavailable' as const}]]);
   expect(filterTradeInPool(pool,new Set(),values,true).map(x=>x.id)).toEqual(['a','b']);
  });
- it('renders the requested SW–NE split, dates, grey unknown and keyboard/tap labels',()=>{
+ it('renders the requested 6:45–12:45 split, dates, grey unknown and keyboard/tap labels',()=>{
   const html=renderToStaticMarkup(<PlayerAvailabilityDot status={{days:2,dates:['2026-10-31','2026-11-07'],day1:'available'}}/>);
-  expect(html).toContain('135deg');expect(html).toContain('var(--up) 50%, #9299a6 50%');expect(html).toContain('Day 1 (31 Oct)');expect(html).toContain('Day 2 (7 Nov)');expect(html).toContain('tabindex="0"');
+  expect(html).toContain('112.5deg');expect(html).toContain('var(--availability-green) 50%, #9299a6 50%');expect(html).toContain('Day 1 (31 Oct)');expect(html).toContain('Day 2 (7 Nov)');expect(html).toContain('tabindex="0"');
  });
  it('single-day dot stays solid and absent values stay absent',()=>{
   expect(renderToStaticMarkup(<PlayerAvailabilityDot status="available"/>)).not.toContain('gradient');

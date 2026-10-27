@@ -432,19 +432,21 @@
   letter-spacing: 0.02em;
 }
 .availability-dot {
+  --availability-green: #4ade80;
+  --availability-red: #fb7185;
   position: relative;
   flex-shrink: 0;
   cursor: help;
   display: inline-block;
-  width: 0.65rem;
-  height: 0.65rem;
+  width: 0.8125rem;
+  height: 0.8125rem;
   margin-left: 0.3rem;
   border-radius: 50%;
   vertical-align: 0.02em;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
-.availability-dot-available { background: var(--up); }
-.availability-dot-unavailable { background: var(--down); }
+.availability-dot-available { background: var(--availability-green); }
+.availability-dot-unavailable { background: var(--availability-red); }
 .availability-tooltip { position:fixed; z-index:10000; pointer-events:none; width:200px; padding:6px 8px; border-radius:5px; background:var(--ink, #172033); color:white; font-size:12px; line-height:1.4; font-weight:400; white-space:normal; }
 .availability-dot:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 .availability-legend { font-size:var(--fs-sm); color:var(--ink-muted); margin:0 0 var(--sp-2); }
