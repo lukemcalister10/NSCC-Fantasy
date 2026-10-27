@@ -445,8 +445,7 @@
 }
 .availability-dot-available { background: var(--up); }
 .availability-dot-unavailable { background: var(--down); }
-.availability-tooltip { display:none; position:absolute; z-index:100; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); width:max-content; max-width:200px; padding:6px 8px; border-radius:5px; background:var(--ink, #172033); color:white; font-size:12px; line-height:1.4; font-weight:400; white-space:normal; }
-.availability-dot:hover .availability-tooltip, .availability-dot:focus .availability-tooltip, .availability-dot-open .availability-tooltip { display:block; }
+.availability-tooltip { position:fixed; z-index:10000; pointer-events:none; width:200px; padding:6px 8px; border-radius:5px; background:var(--ink, #172033); color:white; font-size:12px; line-height:1.4; font-weight:400; white-space:normal; }
 .availability-dot:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 .availability-legend { font-size:var(--fs-sm); color:var(--ink-muted); margin:0 0 var(--sp-2); }
 .availability-day-controls { margin-bottom:4px; }
