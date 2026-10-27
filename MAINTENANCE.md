@@ -35,10 +35,22 @@ Manual verification in steps 3 and 6 remains necessary.
 ## During the week
 
 - **Availability:** club data refreshes while the relevant screens are open, with a
-  five-minute browser refresh interval and server cache. Manager entries override the
-  feed for that round. Green/red dots are planning information; actual lineup inclusion
+  five-minute browser refresh interval and server cache. Session dates/day numbers
+  are preserved: the diagonal upper-left half is Day 1, lower-right Day 2. Grey
+  means unknown/maybe/unanswered, not unavailable. The current unfinished round
+  remains visible between Saturdays, advancing only after scorecard freeze.
+  Manager Day 1/Day 2 entries override the feed independently; Automatic restores
+  that day's feed, including when a legacy round-wide override exists. Managers
+  may update these informational overrides after the first lock, but not after
+  scorecard freeze. These permissions do not unlock trades or selections.
+  Green/red dots are planning information; actual lineup inclusion
   determines whether the captain played when scores are calculated. Check feed errors
   and unmatched names in the registry if dots appear incomplete.
+
+Two-day availability rollout: apply `0022_availability_days.sql` before deploying
+the frontend. It adds only `player_availability_days` and its guards/RLS; existing
+round-wide overrides remain read-compatible. No score or price recompute is needed.
+The trade-page playing filter includes a player available on either day.
 - **Players/photos:** edit via the manager registry. Names shown in the app may differ
   from club names; preserve registry identity and reviewed mappings. Player roles and
   season settings are protected after season lock.

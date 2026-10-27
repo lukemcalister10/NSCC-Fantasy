@@ -14,6 +14,7 @@ import { money, shortDate } from "../lib/format";
 import { previousSeasonFor, type PreviousSeasonLine } from "../lib/previousSeason";
 import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
 import { usePlayerAvailability } from "../lib/playerAvailability";
+import { availabilityRoundOf } from "../lib/availabilityTypes";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 import { playerRoundHistory } from "../lib/playerRoundHistory";
 
@@ -96,7 +97,7 @@ export function PlayerProfile({ modal = false }: { modal?: boolean }) {
   const activeRound = activeRoundOf(rounds.data);
   const popularityRound =
     activeRound ?? [...(rounds.data ?? [])].sort((a, b) => b.seq - a.seq)[0];
-  const availability = usePlayerAvailability(activeRound?.id);
+  const availability = usePlayerAvailability(availabilityRoundOf(rounds.data)?.id);
   const popularity = usePlayerSelectionPopularity(popularityRound?.id, id);
   const ownership = useOwnershipCounts((rounds.data ?? []).map((round) => round.id), id);
   const ownershipByRound = new Map(ownership.data?.map((row) => [row.round_id, row]));

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AvailabilityLegend } from "../components/AvailabilityLegend";
 import { useAuth } from "../auth/AuthProvider";
 import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
@@ -205,6 +206,7 @@ export function Team() {
           onRenamed={() => state.refetch()}
         />} />
       {refusal ? <RefusalNotice refusal={refusal} /> : null}
+      <AvailabilityLegend roundId={state.availabilityRoundId} />
 
       {state.capRemaining !== null &&
       state.investedValue !== null &&

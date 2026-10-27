@@ -19,13 +19,12 @@ import { money, shortDate } from "../../lib/format";
 import { parseRegistrySeed, type SeedRow } from "../../../src/registry/csvImport";
 import { normaliseName } from "../../../src/registry/nameNormalisation";
 import type { PlayerRole } from "../../../src/config/types";
-import { activeRoundOf } from "../../lib/teamQueries";
+import { availabilityRoundOf, asDated, shortAvailabilityDate, type DayStatus, type DayNumber } from "../../lib/availabilityTypes";
 import {
   setPlayerAvailability,
   usePlayerAvailability,
   useManualPlayerAvailability,
   useClubPlayerAvailability,
-  type PlayerAvailabilityStatus,
 } from "../../lib/playerAvailability";
 import { PlayerAvailabilityDot } from "../../components/PlayerAvailabilityDot";
 
@@ -48,7 +47,7 @@ export function AdminPlayers() {
   const seasonId = season.data?.id;
   const players = useAdminPlayers(seasonId);
   const rounds = useAdminRounds(seasonId);
-  const activeRound = activeRoundOf(rounds.data);
+  const activeRound = availabilityRoundOf(rounds.data);
   const events = useRegistryEvents(seasonId, 12);
   const locked = !!season.data?.locked_at;
 
@@ -162,10 +161,12 @@ function AvailabilityManager({
     mutationFn: ({
       playerId,
       status,
+      day,
     }: {
       playerId: string;
-      status: PlayerAvailabilityStatus | null;
-    }) => setPlayerAvailability(round!.id, playerId, status),
+      status: DayStatus | null;
+      day: DayNumber;
+    }) => setPlayerAvailability(round!.id, playerId, status, day),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["player-availability"] }),
   });
@@ -182,9 +183,9 @@ function AvailabilityManager({
     <Section title={`Player availability · ${round.name}`}>
       <p className="admin-help">
         Green means available or named by the club; red means unavailable. No reply
-        or “maybe” shows no dot. The club feed refreshes automatically; your manual
-        Playing/Not playing choice overrides it. Choose Automatic to use the feed again.
-        Indicators move to the next round at lockout.
+        or “maybe” is unknown (grey on a two-day dot). Day 1 is upper-left; Day 2 is lower-right.
+        The club feed refreshes automatically. Each day's manual choice overrides only that day.
+        Automatic restores the club feed for that day. The current round stays visible until its scorecards are frozen.
       </p>
       {club.error ? <p className="refusal" role="alert">Automatic club availability is unavailable: {club.error.message}. Manual entries still work.</p> : null}
       {club.data ? <p className="admin-help">Club feed matched {club.data.matchedMatches} of this round&rsquo;s matches. {club.data.unmatched.length} club names were not matched to selectable players.</p> : null}
@@ -197,23 +198,27 @@ function AvailabilityManager({
           </thead>
           <tbody>
             {players.map((player) => {
-              const current = availability.data?.get(player.id);
-              const overridden = manual.data?.has(player.id) ?? false;
+              const status = availability.data?.get(player.id);
               const pending = mutation.isPending && mutation.variables?.playerId === player.id;
-              const set = (status: PlayerAvailabilityStatus | null) =>
-                mutation.mutate({ playerId: player.id, status });
               return (
                 <tr key={player.id}>
                   <td>
                     <span className="availability-admin-name">
                       <PlayerAvatar name={player.display_name} size={32} photoUrl={player.photo_url} />
                       <strong>{player.display_name}</strong>
-                      <PlayerAvailabilityDot status={current} />
-                      {overridden ? <small>Manual override</small> : null}
+                      <PlayerAvailabilityDot status={status} />
                     </span>
                   </td>
                   <td>
-                    <div className="availability-controls" role="group" aria-label={`${player.display_name} availability`}>
+                    {([1,2] as const).slice(0,club.dayCount).map(day=>{
+                      const override=manual.data?.days.get(player.id)?.get(day);
+                      const explicit=override==="automatic"?undefined:override??manual.data?.legacy.get(player.id);
+                      const current=asDated(status)[day===1?"day1":"day2"];
+                      const overridden=explicit!==undefined;
+                      const set=(next:DayStatus|null)=>mutation.mutate({playerId:player.id,status:next,day});
+                      return <div key={day} className="availability-day-controls">
+                    <small>Day {day}{club.data?.dates[day-1]?` · ${shortAvailabilityDate(club.data.dates[day-1]!)}`:""}{overridden?" · Manual":""}</small>
+                    <div className="availability-controls" role="group" aria-label={`${player.display_name} day ${day} availability`}>
                       <button
                         type="button"
                         className={`availability-choice availability-choice-available${overridden && current === "available" ? " availability-choice-active" : ""}`}
@@ -236,6 +241,7 @@ function AvailabilityManager({
                         onClick={() => set(null)}
                       >Automatic</button>
                     </div>
+                    </div>})}
                   </td>
                 </tr>
               );

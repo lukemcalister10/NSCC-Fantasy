@@ -9,6 +9,8 @@ import { money } from "../lib/format";
 import { activeRoundOf, useSeasonRounds } from "../lib/teamQueries";
 import { lastCompletedRoundOf } from "../lib/roundStatus";
 import { usePlayerAvailability } from "../lib/playerAvailability";
+import { availabilityRoundOf } from "../lib/availabilityTypes";
+import { AvailabilityLegend } from "../components/AvailabilityLegend";
 import { PlayerAvailabilityDot } from "../components/PlayerAvailabilityDot";
 
 type Sort = "price" | "name" | "role" | "average" | "lastRound" | "owned" | "change";
@@ -66,7 +68,8 @@ export function Players() {
   const activeRound = activeRoundOf(rounds.data);
   const lastCompletedRound = lastCompletedRoundOf(rounds.data);
   const ownershipRound = activeRound ?? rounds.data?.[rounds.data.length - 1];
-  const availability = usePlayerAvailability(activeRound?.id);
+  const availabilityRound = availabilityRoundOf(rounds.data);
+  const availability = usePlayerAvailability(availabilityRound?.id);
   const averages = usePlayerAverages(season.data?.id);
   const lastRoundScores = useLastRoundScores(lastCompletedRound?.id);
   const previousRound = rounds.data?.find((round) => round.seq === (ownershipRound?.seq ?? 0) - 1);
@@ -117,6 +120,7 @@ export function Players() {
         <EmptyState>No players in the pool yet.</EmptyState>
       ) : (
         <>
+        <AvailabilityLegend roundId={availabilityRound?.id} />
         <div className="mobile-sort-control">
           <label htmlFor="players-mobile-sort">Sort players</label>
           <select id="players-mobile-sort" value={sort} onChange={(event) => changeSort(event.target.value as Sort)}>

@@ -57,6 +57,9 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       if (typeof row.team !== "string" || typeof row.round !== "string" ||
           typeof row.opponent !== "string" || !Array.isArray(row.players)) return [];
       return [{
+        sessionId: typeof row.sessionId === "string" ? row.sessionId : null,
+        date: typeof row.date === "string" && Number.isFinite(Date.parse(row.date)) ? row.date : null,
+        dayNumber: row.dayNumber === 1 || row.dayNumber === 2 ? row.dayNumber : null,
         team: row.team,
         round: row.round,
         opponent: row.opponent,

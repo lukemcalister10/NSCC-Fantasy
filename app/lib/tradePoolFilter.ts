@@ -1,4 +1,5 @@
 import type { PlayerAvailabilityStatus } from './playerAvailability';
+import { availableOnAnyDay } from './availabilityTypes';
 
 /** Browse-only filter: never changes selected trade IDs or trade validation. */
 export function filterTradeInPool<T extends { id: string }>(
@@ -8,5 +9,5 @@ export function filterTradeInPool<T extends { id: string }>(
   onlyPlaying: boolean,
 ): T[] {
   return pool.filter(player => !heldIds.has(player.id)
-    && (!onlyPlaying || availability.get(player.id) === 'available'));
+    && (!onlyPlaying || availableOnAnyDay(availability.get(player.id))));
 }

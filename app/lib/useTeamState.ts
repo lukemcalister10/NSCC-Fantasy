@@ -28,6 +28,7 @@ import {
   type TradeRow,
 } from "./squad";
 import { usePlayerAvailability, type PlayerAvailabilityStatus } from "./playerAvailability";
+import { availabilityRoundOf } from "./availabilityTypes";
 
 /**
  * The assembled team state both /team and /team/trades read from. One place
@@ -79,6 +80,7 @@ export interface TeamState {
   poolById: Map<string, PoolPlayer>;
   midMatchLocked: Set<string>;
   availability: Map<string, PlayerAvailabilityStatus>;
+  availabilityRoundId: string | undefined;
 
   holdings: HoldingView[];
   capRemaining: number | null;
@@ -113,7 +115,8 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
   const selectionsQ = useTeamSelections(teamId);
   const poolQ = usePool(seasonId, roundsQ.data, activeRound?.seq);
   const lockedQ = useMidMatchLockedPlayers(roundsQ.data);
-  const availabilityQ = usePlayerAvailability(activeRound?.id);
+  const availabilityRound = availabilityRoundOf(rounds);
+  const availabilityQ = usePlayerAvailability(availabilityRound?.id);
 
   const pool = useMemo(() => poolQ.data ?? [], [poolQ.data]);
   const poolById = useMemo(() => new Map(pool.map((p) => [p.id, p])), [pool]);
@@ -210,6 +213,7 @@ export function useTeamState(seasonId: string | undefined, seasonLocked: boolean
     poolById,
     midMatchLocked,
     availability: availabilityQ.data ?? new Map<string, PlayerAvailabilityStatus>(),
+    availabilityRoundId: availabilityRound?.id,
     holdings: holdingViews,
     capRemaining,
     investedValue,

@@ -14,7 +14,7 @@ manager access is checked in the app and enforced by the database.
 - Fixtures, matchup squad comparisons, team profiles, sortable ladder and team values.
 - Player headshots, averages, last-round scores, ownership and ownership history.
 - Player profile overlays, 2025/26 club stats and prices shown after each frozen round.
-- Club availability feed with manager overrides; actual scorecard participation determines scoring.
+- Per-day club availability with diagonal two-day dots and independent manager overrides; actual scorecard participation determines scoring.
 - Manager registry, availability/photo editing, scorecards, rounds, recompute and freeze checks.
 - Manager-only participant password resets, without an email provider.
 - Home-screen icons and web app manifest for installation on phones.
@@ -35,7 +35,7 @@ setup instructions on the active competition.
 - `api/`: server-only availability, recompute/connection health and account administration endpoints.
 - `src/engines/` and `src/recompute/`: scoring, pricing and complete-season recomputation.
 - `src/db/`: raw data loading and transactional derived-state persistence.
-- `supabase/migrations/`: ordered database changes (`0001`–`0021` currently).
+- `supabase/migrations/`: ordered database changes (`0001`–`0022` currently).
 - `test/`: engine, database, permissions, trade, lock and regression tests.
 - `app/routes/Help.tsx`: editable Help text; some values are read from season configuration.
 - `app/data/previousSeason2526.json`: imported prior-season club statistics.

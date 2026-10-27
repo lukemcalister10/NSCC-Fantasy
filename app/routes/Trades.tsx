@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AvailabilityLegend } from "../components/AvailabilityLegend";
 import { useSeason } from "../lib/queries";
 import { useTeamState } from "../lib/useTeamState";
 import {
@@ -250,6 +251,7 @@ export function Trades() {
       <LockNotice activeRound={state.activeRound} allRoundsLocked={state.allRoundsLocked} />
       </div>
       <TeamTabs />
+      <AvailabilityLegend roundId={state.availabilityRoundId} />
       {resultsPending ? (
         <div className="lock-notice" role="status">
           Trading is paused while the previous round's results and prices are processed.
@@ -358,7 +360,7 @@ export function Trades() {
           </div>
           <label className="trade-playing-filter">
             <input type="checkbox" checked={onlyPlaying} onChange={(event) => setOnlyPlaying(event.target.checked)} />
-            Only show playing
+            Only show playing (either day)
           </label>
         </div>
         <section className="trade-side trade-in-side" aria-labelledby="trade-in-title">
