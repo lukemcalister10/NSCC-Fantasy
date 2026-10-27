@@ -272,6 +272,7 @@ export function useTeamSelections(teamId: string | undefined) {
 
 export interface PoolPlayer {
   id: string;
+  active: boolean;
   display_name: string;
   role: PlayerRole;
   wk_eligible: boolean;
@@ -306,6 +307,7 @@ export function usePool(
     queryFn: async (): Promise<PoolPlayer[]> => {
       interface Row {
         id: string;
+        active: boolean;
         display_name: string;
         role: PlayerRole;
         wk_eligible: boolean;
@@ -317,10 +319,9 @@ export function usePool(
         await supabase
           .from("players")
           .select(
-            "id,display_name,role,wk_eligible,starting_price,photo_path,price_history(seq,price,match_id)",
+            "id,active,display_name,role,wk_eligible,starting_price,photo_path,price_history(seq,price,match_id)",
           )
           .eq("season_id", seasonId!)
-          .eq("active", true)
           .order("display_name"),
       );
 
@@ -335,6 +336,7 @@ export function usePool(
               p.starting_price);
         return {
           id: p.id,
+          active: p.active,
           display_name: p.display_name,
           role: p.role,
           wk_eligible: p.wk_eligible,

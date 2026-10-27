@@ -46,6 +46,14 @@ export function translateRefusal(err: unknown): Refusal {
     err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
   const m = serverMessage;
 
+  if (/inactive player .* cannot be bought/i.test(m)) {
+    return {
+      reason: "That player is no longer available to buy. Refresh and choose another player. Existing owners can still keep or sell them.",
+      authority: "Inactive player purchase guard",
+      serverMessage,
+    };
+  }
+
   if (/is locked \(lock_at/.test(m) || /\(G4\)/.test(m) || /has locked; its trades cannot be undone/i.test(m)) {
     return {
       reason:

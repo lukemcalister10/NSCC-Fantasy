@@ -88,6 +88,7 @@ export function AdminPlayers() {
       ) : null}
 
       <Section title="Registry">
+        <p className="admin-help">Untick Active and save to hide a player from the public player pool and new purchases. Existing owners keep them and can still trade them out. Their history and prices are retained. Tick Active again to make them available to buy.</p>
         {players.error ? (
           <ErrorState error={players.error} />
         ) : (players.data?.length ?? 0) === 0 ? (

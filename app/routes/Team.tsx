@@ -29,6 +29,7 @@ import { TeamField } from "../components/team/TeamField";
 import { TeamNameEditor } from "../components/team/TeamNameEditor";
 import { money } from "../lib/format";
 import type { PoolPlayer } from "../lib/teamQueries";
+import { selectablePlayers } from "../lib/tradePoolFilter";
 import "../styles/team.css";
 
 /**
@@ -389,7 +390,7 @@ function InitialBuild({
   const squad = state.config!.squad;
 
   const pickedPlayers = useMemo(
-    () => [...picked].map((id) => state.poolById.get(id)).filter((p): p is PoolPlayer => !!p),
+    () => [...picked].map((id) => state.poolById.get(id)).filter((p): p is PoolPlayer => !!p && p.active),
     [picked, state.poolById],
   );
 
@@ -489,7 +490,7 @@ function InitialBuild({
       ) : null}
 
       <PoolPicker
-        pool={state.pool}
+        pool={selectablePlayers(state.pool)}
         selectedIds={picked}
         onToggle={toggle}
         availability={state.availability}

@@ -155,6 +155,8 @@ export function Trades() {
     blockers.push("Your squad or player pool has changed. Clear this draft and choose again.");
   if (buys.some((p) => state.holdings.some((h) => h.playerId === p.id)))
     blockers.push("A selected trade-in is already in your squad. Clear this draft and choose again.");
+  if (buys.some((p) => !p.active))
+    blockers.push("A selected trade-in is no longer active. Remove them from this draft and choose another player.");
   if (sells.length > maxBatch) blockers.push(`Choose no more than ${maxBatch} trades.`);
   if (sells.some((h) => h.midMatchLocked) || buys.some((p) => state.midMatchLocked.has(p.id)))
     blockers.push("A selected player's match is in progress, so they cannot be traded.");

@@ -35,7 +35,7 @@ setup instructions on the active competition.
 - `api/`: server-only availability, recompute/connection health and account administration endpoints.
 - `src/engines/` and `src/recompute/`: scoring, pricing and complete-season recomputation.
 - `src/db/`: raw data loading and transactional derived-state persistence.
-- `supabase/migrations/`: ordered database changes (`0001`–`0022` currently).
+- `supabase/migrations/`: ordered database changes (`0001`–`0023` currently).
 - `test/`: engine, database, permissions, trade, lock and regression tests.
 - `app/routes/Help.tsx`: editable Help text; some values are read from season configuration.
 - `app/data/previousSeason2526.json`: imported prior-season club statistics.

@@ -5,6 +5,21 @@ the pre-launch reports. Production: https://nsccfantasy.vercel.app/ . Manager: `
 
 ## Publish a round
 
+### Hide a departed player
+
+In **Admin → Players → Registry**, untick **Active** and save. This hides the
+player from the public Players list, initial squad picker and trade-ins. Existing
+owners retain their player, name, role and price and may sell them under the usual
+trade limits and locks. Undo may restore an inactive holding. Scores, history,
+captaincy and salary caps are not rewritten. Reactivate by ticking Active again.
+
+Apply `0023_inactive_player_purchases.sql` with this release. It refuses new
+participant buys of inactive players at the database boundary, including stale
+browser requests; sales and existing selections remain valid. Trusted historical
+imports remain permitted. This migration changes no player or ledger rows.
+
+### Weekly publication
+
 1. Open **Manager → Rounds**. Confirm the round, club matches and stored lock time.
    The manager's time inputs use Adelaide time; the participant display formats the
    stored timestamp. Do not infer a lock time from a default or a screenshot.

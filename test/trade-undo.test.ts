@@ -55,6 +55,36 @@ describe("pre-lock trade undo", () => {
     await seed(db);
   }, 120_000);
 
+  it("keeps an inactive holding, allows selling it and undoing the sale, but refuses buying it again", async () => {
+    await db.query("UPDATE players SET active=false WHERE id=$1", [player(1)]);
+    await asAuthed(db, { role: "authenticated", sub: owner }, () =>
+      db.query("SELECT public.materialise_selections($1)", [round2]));
+    expect(await held(db)).toContain(player(1));
+    const buyId = await makeBatch(db, 1, 7, "2026-02-01");
+    expect(await held(db)).not.toContain(player(1));
+    await expect(makeBatch(db, 7, 1, "2026-02-02")).rejects.toThrow(/inactive player .* cannot be bought/);
+    expect(await held(db)).toContain(player(7));
+    await asAuthed(db, { role: "authenticated", sub: owner }, () =>
+      db.query("SELECT public.undo_latest_trades($1,$2)", [team, buyId]));
+    expect(await held(db)).toContain(player(1));
+    expect((await db.query("SELECT starting_price,active FROM players WHERE id=$1", [player(1)])).rows)
+      .toEqual([{starting_price:20000,active:false}]);
+    expect((await db.query("SELECT id FROM trades WHERE round_id=$1 AND player_id=$2", [round1,player(1)])).rows).toHaveLength(1);
+  }, 120_000);
+
+  it("refuses an inactive founding buy and permits a purchase after reactivation", async () => {
+    await db.query("UPDATE players SET active=false WHERE id=$1", [player(7)]);
+    const newTeam=player(20);
+    await db.query("INSERT INTO fantasy_teams(id,season_id,owner_profile_id,name) VALUES($1,$2,$3,'New team')",[newTeam,season,stranger]);
+    await expect(asAuthed(db,{role:'authenticated',sub:stranger},()=>db.query(
+      "INSERT INTO trades(fantasy_team_id,round_id,kind,player_id,price) VALUES($1,$2,'buy',$3,20000)",
+      [newTeam,round2,player(7)]))).rejects.toThrow(/inactive player .* cannot be bought/);
+    expect((await db.query("SELECT id FROM trades WHERE fantasy_team_id=$1",[newTeam])).rows).toHaveLength(0);
+    await db.query("UPDATE players SET active=true WHERE id=$1", [player(7)]);
+    await makeBatch(db,1,7,'2026-02-01');
+    expect(await held(db)).toContain(player(7));
+  },120_000);
+
   it("undoes the latest trade atomically, restores the side and trade slot, and keeps an audit copy", async () => {
     const buyId = await makeBatch(db, 1, 7, "2026-02-01");
     expect(await held(db)).toContain(player(7));
