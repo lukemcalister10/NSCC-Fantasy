@@ -421,7 +421,12 @@ function PlayerRow({
             }),
         active: draft.active,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: ["admin"] }),
+      qc.invalidateQueries({ queryKey: ["players"] }),
+      qc.invalidateQueries({ queryKey: ["team-pool"] }),
+      qc.invalidateQueries({ queryKey: ["player-availability"] }),
+    ]),
   });
 
   /**
